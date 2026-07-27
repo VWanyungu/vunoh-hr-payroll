@@ -8,6 +8,7 @@ import forgotPasswordRouter from "./routers/forgotPasswordRouter.js";
 import resetUserPasswordRouter from "./routers/resetUserPasswordRouter.js";
 import usersRouter from "./routers/usersRouter.js";
 import teamsRouter from "./routers/teamsRouter.js";
+import employeesRouter from "./routers/employeesRouter.js";
 
 import { authLimiter } from "../middlewares/rateLimit.js";
 
@@ -18,6 +19,7 @@ router.use(authorize());
 
 router.use("/v1/users", usersRouter);
 router.use("/v1/teams", teamsRouter);
+router.use("/v1/employees", employeesRouter);
 router.use("/v1/signup", authLimiter, usersRouter);
 router.use("/v1/login", authLimiter, loginRouter);
 router.use("/v1/reset-password", authLimiter, resetUserPasswordRouter);
