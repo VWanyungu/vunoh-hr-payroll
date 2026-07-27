@@ -16,6 +16,15 @@ export async function up(knex) {
       table.timestamp("created_at").defaultTo(knex.fn.now());
     });
   }
+
+  if (!(await knex.schema.hasTable("tokens"))) {
+    await knex.schema.createTable("tokens", (table) => {
+      table.increments("id").primary();
+      table.string("token").notNullable();
+      table.boolean("blacklisted").defaultTo(true);
+      table.timestamp("created_at").defaultTo(knex.fn.now());
+    });
+  }
 }
 
 /**
