@@ -2,9 +2,17 @@ import express from "express";
 const router = express.Router();
 import { Users } from "../database/utils/database.js";
 import hashPassword from "../utils/hashPassword.js";
-import { createUserSchema, updateUserSchema } from "../utils/validation.js";
+import {
+  createUserSchema,
+  updateUserSchema,
+  statusSchema,
+} from "../utils/validation.js";
 import type { AuthenticatedRequest } from "../types.js";
-import type { CreateUserInput, UpdateUserInput } from "../types.js";
+import type {
+  CreateUserInput,
+  UpdateUserInput,
+  UserStatus,
+} from "../types.js";
 
 router.get("/", async (req: AuthenticatedRequest, res) => {
   const user = req.user;
@@ -28,12 +36,27 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
 
   switch (type) {
     case "multiple":
-      const { page = 1, limit = 10 } = req.query;
+      const { page = 1, limit = 10, status } = req.query;
+
+      if (status !== undefined) {
+        const { error: statusError } = statusSchema.validate(status);
+
+        if (statusError) {
+          return res.status(400).json({
+            status: "error",
+            data: {
+              errors: statusError.details.map((detail) => detail.message),
+            },
+            message: "Wrong user input",
+          });
+        }
+      }
 
       try {
         const response = await Users.getAllUsers({
           page: parseInt(String(page)),
           limit: parseInt(String(limit)),
+          status: status as UserStatus | undefined,
         });
 
         res.status(200).json({

@@ -27,10 +27,12 @@ export type UpdateUserPasswordInput = {
   passwordHash: string;
 };
 
+export type UserStatus = "pending" | "approved" | "rejected";
+
 export type UpdateUserInput = {
   name?: string;
   email?: string;
-  status?: "pending" | "approved" | "rejected";
+  status?: UserStatus;
 };
 
 export type UserLookupResult = {
@@ -70,4 +72,8 @@ export type UpdateTeamInput = {
 export type TeamFilters = {
   id?: string | undefined;
   name?: string | undefined;
+};
+
+export type UserFilters = {
+  status?: UserStatus | undefined;
 };
