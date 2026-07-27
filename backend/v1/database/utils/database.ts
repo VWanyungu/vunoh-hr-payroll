@@ -8,6 +8,7 @@ import type {
   CreateTeamInput,
   UpdateTeamInput,
   TeamFilters,
+  UserFilters,
   PaginationInput,
 } from "../../types.js";
 
@@ -15,14 +16,12 @@ export class Users {
   static async getAllUsers({
     page = 1,
     limit = 10,
-  }: {
-    page?: number;
-    limit?: number;
-  }) {
+    status,
+  }: PaginationInput & UserFilters) {
     try {
       const offset = (page - 1) * limit;
 
-      const users = await db("users")
+      const usersQuery = db("users")
         .leftJoin("user_roles", "users.id", "user_roles.user_id")
         .select(
           "users.id",
@@ -53,12 +52,18 @@ export class Users {
           "users.status",
           "users.created_at",
           "users.updated_at",
-        )
+        );
+
+      if (status) usersQuery.where("users.status", status);
+
+      const users = await usersQuery
         .limit(limit)
         .offset(offset)
         .orderBy("users.id");
 
-      const total = await db("users").count("* as total");
+      const totalQuery = db("users");
+      if (status) totalQuery.where("status", status);
+      const total = await totalQuery.count("* as total");
 
       return {
         users,

@@ -6,7 +6,11 @@ const passwordHashSchema = Joi.string().required(); // Typically just ensure it 
 const roleSchema = Joi.string()
   .valid("super_admin", "hr_admin", "manager", "employee")
   .default("employee");
-const statusSchema = Joi.string().valid("pending", "approved", "rejected");
+export const statusSchema = Joi.string().valid(
+  "pending",
+  "approved",
+  "rejected",
+);
 
 export const createUserSchema = Joi.object({
   name: firstNameSchema,
