@@ -82,3 +82,40 @@ export type AssignRoleInput = {
   role: string;
   teamId?: string;
 };
+
+export type EmploymentType = "full_time" | "contract";
+
+export type CreateEmployeeInput = {
+  userId: string;
+  jobTitle: string;
+  teamId: string;
+  managerId?: string;
+  startDate: string;
+  salary: number;
+  employmentType: EmploymentType;
+  resume?: string;
+  phone?: string;
+  profilePicture?: string;
+  nationalId?: number;
+};
+
+export type UpdateEmployeeInput = {
+  jobTitle?: string;
+  teamId?: string;
+  managerId?: string;
+  startDate?: string;
+  salary?: number;
+  employmentType?: EmploymentType;
+  resume?: string;
+  phone?: string;
+  profilePicture?: string;
+  nationalId?: number;
+};
+
+export type EmployeeFilters = {
+  team?: string | undefined;
+  manager?: string | undefined;
+  employmentType?: EmploymentType | undefined;
+  isActive?: boolean | undefined;
+  search?: string | undefined;
+};

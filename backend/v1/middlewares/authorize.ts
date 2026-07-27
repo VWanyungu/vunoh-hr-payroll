@@ -50,6 +50,31 @@ export default function authorize() {
         pattern: /^\/v1\/teams\/[^/]+$/,
         roles: ["super_admin", "hr_admin"],
       },
+      {
+        method: "GET",
+        pattern: /^\/v1\/employees$/,
+        roles: ["super_admin", "hr_admin", "manager"],
+      },
+      {
+        method: "GET",
+        pattern: /^\/v1\/employees\/[^/]+$/,
+        roles: ["super_admin", "hr_admin", "manager", "employee"],
+      },
+      {
+        method: "POST",
+        pattern: /^\/v1\/employees$/,
+        roles: ["super_admin", "hr_admin", "manager", "employee"],
+      },
+      {
+        method: "PUT",
+        pattern: /^\/v1\/employees\/[^/]+$/,
+        roles: ["super_admin", "hr_admin", "manager", "employee"],
+      },
+      {
+        method: "POST",
+        pattern: /^\/v1\/employees\/[^/]+\/deactivate$/,
+        roles: ["super_admin", "hr_admin"],
+      },
     ];
 
     const matchedRoute = protectedRoutes.find(
