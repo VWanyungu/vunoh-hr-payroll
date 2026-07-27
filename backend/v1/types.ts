@@ -27,6 +27,14 @@ export type UpdateUserPasswordInput = {
   passwordHash: string;
 };
 
+export type UserStatus = "pending" | "approved" | "rejected";
+
+export type UpdateUserInput = {
+  name?: string;
+  email?: string;
+  status?: UserStatus;
+};
+
 export type UserLookupResult = {
   userId?: string;
   email?: string;
@@ -49,6 +57,23 @@ export type PublicRoute = {
 };
 
 export type PaginationInput = {
-  page?: number;
-  limit?: number;
+  page?: number | undefined;
+  limit?: number | undefined;
+};
+
+export type CreateTeamInput = {
+  name: string;
+};
+
+export type UpdateTeamInput = {
+  name: string;
+};
+
+export type TeamFilters = {
+  id?: string | undefined;
+  name?: string | undefined;
+};
+
+export type UserFilters = {
+  status?: UserStatus | undefined;
 };
