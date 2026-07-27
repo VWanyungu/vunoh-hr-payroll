@@ -12,3 +12,13 @@ export const createUserSchema = Joi.object({
   email: emailSchema,
   passwordHash: passwordHashSchema,
 });
+
+const teamNameSchema = Joi.string().trim().min(1).max(100).required();
+
+export const createTeamSchema = Joi.object({
+  name: teamNameSchema,
+});
+
+export const updateTeamSchema = Joi.object({
+  name: teamNameSchema,
+});

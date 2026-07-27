@@ -4,6 +4,10 @@ import type {
   CreateUserInput,
   UpdateUserPasswordInput,
   UserLookupResult,
+  CreateTeamInput,
+  UpdateTeamInput,
+  TeamFilters,
+  PaginationInput,
 } from "../../types.js";
 
 export class Users {
@@ -160,6 +164,121 @@ export class Users {
         status: "fail",
         error: err,
       };
+    }
+  }
+}
+
+export class Teams {
+  static async getAllTeams({
+    id,
+    name,
+    page,
+    limit,
+  }: TeamFilters & PaginationInput) {
+    try {
+      const teamsQuery = db("teams").select(
+        "id",
+        "name",
+        "created_at",
+        "updated_at",
+      );
+
+      if (id) teamsQuery.where("id", id);
+      if (name) teamsQuery.where("name", "ilike", `%${name}%`);
+
+      if (page !== undefined || limit !== undefined) {
+        const resolvedPage = page ?? 1;
+        const resolvedLimit = limit ?? 10;
+        const offset = (resolvedPage - 1) * resolvedLimit;
+
+        const teams = await teamsQuery
+          .limit(resolvedLimit)
+          .offset(offset)
+          .orderBy("id");
+
+        const totalQuery = db("teams");
+        if (id) totalQuery.where("id", id);
+        if (name) totalQuery.where("name", "ilike", `%${name}%`);
+        const total = await totalQuery.count("* as total");
+
+        return {
+          teams,
+          pagination: {
+            page: resolvedPage,
+            limit: resolvedLimit,
+            total: total && total[0] && Number(total[0].total),
+            pages:
+              total &&
+              total[0] &&
+              Math.ceil(Number(total[0].total) / resolvedLimit),
+          },
+        };
+      }
+
+      const teams = await teamsQuery.orderBy("id");
+
+      return { teams, pagination: null };
+    } catch (error) {
+      return { teams: [], pagination: null, error };
+    }
+  }
+
+  static async getTeamById(id: string) {
+    try {
+      const team = await db("teams")
+        .select("id", "name", "created_at", "updated_at")
+        .where("id", id)
+        .first();
+
+      return { team: team ?? null };
+    } catch (error) {
+      return { team: null, error };
+    }
+  }
+
+  static async createTeam(teamObj: CreateTeamInput) {
+    try {
+      const [team] = await db("teams")
+        .insert({ name: teamObj.name })
+        .returning(["id", "name", "created_at", "updated_at"]);
+
+      return { team };
+    } catch (error) {
+      return { team: null, error };
+    }
+  }
+
+  static async updateTeam(id: string, teamObj: UpdateTeamInput) {
+    try {
+      const [team] = await db("teams")
+        .where("id", id)
+        .update({ name: teamObj.name })
+        .returning(["id", "name", "created_at", "updated_at"]);
+
+      if (!team) {
+        return { team: null, error: "Team not found" };
+      }
+
+      return { team };
+    } catch (error) {
+      return { team: null, error };
+    }
+  }
+
+  static async deleteTeam(id: string) {
+    try {
+      const [team] = await db("teams")
+        .where("id", id)
+        .del()
+        .returning(["id", "name"]);
+
+      if (!team) {
+        return { team: null, error: "Team not found" };
+      }
+
+      return { team };
+    } catch (error) {
+      return { team: null, error };
     }
   }
 }
