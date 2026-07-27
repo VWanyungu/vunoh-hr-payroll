@@ -1,0 +1,39 @@
+{
+  "name": "hr-payroll-vw",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "migrate": "knex migrate:latest",
+    "seed": "knex seed:run",
+    "dev": "tsx watch index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.35.6",
+    "bcrypt": "^6.0.0",
+    "cloudinary": "^2.10.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.2.0",
+    "joi": "^18.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "knex": "^3.1.0",
+    "multer": "^2.1.1",
+    "nodemailer": "^7.0.9",
+    "nodemon": "^3.1.10",
+    "pg": "^8.16.3",
+    "pino": "^10.3.1",
+    "rotating-file-stream": "^3.2.9"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  }
+}
