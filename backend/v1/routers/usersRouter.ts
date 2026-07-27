@@ -2,9 +2,9 @@ import express from "express";
 const router = express.Router();
 import { Users } from "../database/utils/database.js";
 import hashPassword from "../utils/hashPassword.js";
-import { createUserSchema } from "../utils/validation.js";
+import { createUserSchema, updateUserSchema } from "../utils/validation.js";
 import type { AuthenticatedRequest } from "../types.js";
-import type { CreateUserInput } from "../types.js";
+import type { CreateUserInput, UpdateUserInput } from "../types.js";
 
 router.get("/", async (req: AuthenticatedRequest, res) => {
   const user = req.user;
@@ -132,8 +132,52 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/", (req, res) => {
-  res.status(200).send("Users route");
+router.put("/:id", async (req, res) => {
+  const userObj: UpdateUserInput = {
+    ...(req.body.name !== undefined && { name: req.body.name }),
+    ...(req.body.email !== undefined && { email: req.body.email }),
+    ...(req.body.status !== undefined && { status: req.body.status }),
+  };
+
+  const { error, value } = updateUserSchema.validate(userObj, {
+    abortEarly: false,
+  });
+
+  if (error) {
+    const errorMessages = error.details.map((detail) => detail.message);
+
+    return res.status(400).json({
+      status: "error",
+      data: {
+        errors: errorMessages,
+      },
+      message: "Wrong user input",
+    });
+  }
+
+  try {
+    const response = await Users.updateUser(req.params.id, value);
+
+    if (!response.user) {
+      return res.status(404).json({
+        status: "error",
+        data: null,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: { response },
+      message: "User updated successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      data: null,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 });
 
 router.delete("/", (req, res) => {

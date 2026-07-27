@@ -27,6 +27,12 @@ export type UpdateUserPasswordInput = {
   passwordHash: string;
 };
 
+export type UpdateUserInput = {
+  name?: string;
+  email?: string;
+  status?: "pending" | "approved" | "rejected";
+};
+
 export type UserLookupResult = {
   userId?: string;
   email?: string;
