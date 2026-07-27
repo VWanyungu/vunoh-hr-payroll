@@ -41,6 +41,8 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/multer": "^2.1.0"
+    "@types/multer": "^2.1.0",
+    "jsdom": "^29.1.1",
+    "pino-pretty": "^13.1.3"
   }
 }
