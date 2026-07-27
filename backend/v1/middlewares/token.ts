@@ -12,11 +12,15 @@ export default function authenticateToken() {
     ];
 
     const isPermitted =
-      ["/login", "/logout", "/signup", "/forgot-password", "/token"].includes(
-        req.path,
-      ) ||
-      req.path.startsWith("/reset-password/") ||
-      (req.path === "/users" && req.method === "POST") ||
+      [
+        "/v1/login",
+        "/v1/logout",
+        "/v1/signup",
+        "/v1/forgot-password",
+        "/v1/token",
+      ].includes(req.path) ||
+      req.path.startsWith("/v1/reset-password/") ||
+      (req.path === "/v1/users" && req.method === "POST") ||
       publicRoutes.some(
         (route) => route.method === req.method && route.pattern.test(req.path),
       );
