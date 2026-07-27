@@ -77,3 +77,8 @@ export type TeamFilters = {
 export type UserFilters = {
   status?: UserStatus | undefined;
 };
+
+export type AssignRoleInput = {
+  role: string;
+  teamId?: string;
+};
