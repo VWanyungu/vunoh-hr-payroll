@@ -49,6 +49,19 @@ export type PublicRoute = {
 };
 
 export type PaginationInput = {
-  page?: number;
-  limit?: number;
+  page?: number | undefined;
+  limit?: number | undefined;
+};
+
+export type CreateTeamInput = {
+  name: string;
+};
+
+export type UpdateTeamInput = {
+  name: string;
+};
+
+export type TeamFilters = {
+  id?: string | undefined;
+  name?: string | undefined;
 };

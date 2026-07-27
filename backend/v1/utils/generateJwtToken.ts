@@ -10,7 +10,7 @@ export default function generateJWTToken(user: AuthUser & { id?: string }, type:
     let token, refreshToken, forgotPasswordToken
     switch (type) {
         case "all":
-            token = jwt.sign({ userId: user.userId, email: user.email }, accessTokenSecret, {expiresIn: '15m'});
+            token = jwt.sign({ userId: user.userId, email: user.email, role: user.role }, accessTokenSecret, {expiresIn: '15m'});
             refreshToken = jwt.sign({ userId: user.userId, email: user.email }, refreshTokenSecret, {expiresIn: '7d'});
             forgotPasswordToken = jwt.sign({ userId: user.userId, email: user.email }, forgotPasswordTokenSecret, {expiresIn: '15m'});
             return {token, refreshToken, forgotPasswordToken}
@@ -23,12 +23,12 @@ export default function generateJWTToken(user: AuthUser & { id?: string }, type:
             refreshToken = jwt.sign({ userId: user.userId, email: user.email }, refreshTokenSecret, {expiresIn: '7d'});
             return {refreshToken}
 
-        case "token": 
-            token = jwt.sign({ userId: user.userId, email: user.email }, accessTokenSecret, {expiresIn: '15m'});
+        case "token":
+            token = jwt.sign({ userId: user.userId, email: user.email, role: user.role }, accessTokenSecret, {expiresIn: '15m'});
             return {token}
-            
+
         default:
-            token = jwt.sign({ userId: user.userId, email: user.email }, accessTokenSecret, {expiresIn: '15m'});
+            token = jwt.sign({ userId: user.userId, email: user.email, role: user.role }, accessTokenSecret, {expiresIn: '15m'});
             refreshToken = jwt.sign({ userId: user.userId, email: user.email }, refreshTokenSecret, {expiresIn: '7d'});
             forgotPasswordToken = jwt.sign({ userId: user.userId, email: user.email }, forgotPasswordTokenSecret, {expiresIn: '15m'});
             return {token, refreshToken, forgotPasswordToken}

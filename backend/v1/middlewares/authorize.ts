@@ -25,6 +25,21 @@ export default function authorize() {
         pattern: /^\/v1\/users$/,
         roles: ["super_admin"],
       },
+      {
+        method: "POST",
+        pattern: /^\/v1\/teams$/,
+        roles: ["super_admin", "hr_admin"],
+      },
+      {
+        method: "PATCH",
+        pattern: /^\/v1\/teams\/[^/]+$/,
+        roles: ["super_admin", "hr_admin"],
+      },
+      {
+        method: "DELETE",
+        pattern: /^\/v1\/teams\/[^/]+$/,
+        roles: ["super_admin", "hr_admin"],
+      },
     ];
 
     const matchedRoute = protectedRoutes.find(
