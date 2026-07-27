@@ -13,12 +13,12 @@ const router = express.Router();
 
 router.use(authenticateToken());
 
-router.use("/users", usersRouter);
-router.use("/signup", authLimiter, usersRouter);
-router.use("/login", authLimiter, loginRouter);
-router.use("/reset-password", authLimiter, resetUserPasswordRouter);
-router.use("/logout", logoutRouter);
-router.use("/forgot-password", authLimiter, forgotPasswordRouter);
-router.use("/token", authLimiter, refreshTokenRouter);
+router.use("/v1/users", usersRouter);
+router.use("/v1/signup", authLimiter, usersRouter);
+router.use("/v1/login", authLimiter, loginRouter);
+router.use("/v1/reset-password", authLimiter, resetUserPasswordRouter);
+router.use("/v1/logout", logoutRouter);
+router.use("/v1/forgot-password", authLimiter, forgotPasswordRouter);
+router.use("/v1/token", authLimiter, refreshTokenRouter);
 
 export default router;
