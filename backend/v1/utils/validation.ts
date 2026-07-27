@@ -6,12 +6,19 @@ const passwordHashSchema = Joi.string().required(); // Typically just ensure it 
 const roleSchema = Joi.string()
   .valid("super_admin", "hr_admin", "manager", "employee")
   .default("employee");
+const statusSchema = Joi.string().valid("pending", "approved", "rejected");
 
 export const createUserSchema = Joi.object({
   name: firstNameSchema,
   email: emailSchema,
   passwordHash: passwordHashSchema,
 });
+
+export const updateUserSchema = Joi.object({
+  name: firstNameSchema.optional(),
+  email: emailSchema.optional(),
+  status: statusSchema,
+}).min(1);
 
 const teamNameSchema = Joi.string().trim().min(1).max(100).required();
 

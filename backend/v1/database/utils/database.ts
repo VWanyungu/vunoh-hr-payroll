@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import type {
   CreateUserInput,
   UpdateUserPasswordInput,
+  UpdateUserInput,
   UserLookupResult,
   CreateTeamInput,
   UpdateTeamInput,
@@ -139,6 +140,23 @@ export class Users {
       };
     } catch (error) {
       return { error };
+    }
+  }
+
+  static async updateUser(id: string, userObj: UpdateUserInput) {
+    try {
+      const [user] = await db("users")
+        .where("id", id)
+        .update(userObj)
+        .returning(["id", "name", "email", "status", "created_at", "updated_at"]);
+
+      if (!user) {
+        return { user: null, error: "User not found" };
+      }
+
+      return { user };
+    } catch (error) {
+      return { user: null, error };
     }
   }
 

@@ -17,7 +17,7 @@ export default function authorize() {
       },
       {
         method: "PUT",
-        pattern: /^\/v1\/users$/,
+        pattern: /^\/v1\/users\/[^/]+$/,
         roles: ["super_admin", "hr_admin"],
       },
       {
