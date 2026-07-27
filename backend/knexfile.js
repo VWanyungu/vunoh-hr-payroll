@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 export default {
-  development: {
+  "development": {
     client: 'pg',
     connection: {
       host: process.env.DB_HOST,
@@ -17,7 +17,7 @@ export default {
     seeds: { directory: './v1/seeds' }
   },
 
-  staging: {
+  "staging": {
     client: 'pg',
     connection: {
       host: process.env.DB_HOST,
@@ -37,7 +37,7 @@ export default {
     },
   },
 
-  production: {
+  "production": {
     client: 'pg',
     connection: {
       host: process.env.PRODUCTION_DB_HOST,
