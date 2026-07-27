@@ -10,6 +10,7 @@ import type {
   TeamFilters,
   UserFilters,
   PaginationInput,
+  AssignRoleInput,
 } from "../../types.js";
 
 export class Users {
@@ -85,6 +86,19 @@ export class Users {
         },
         error,
       };
+    }
+  }
+
+  static async getUserById(id: string) {
+    try {
+      const user = await db("users")
+        .select("id", "name", "email", "status")
+        .where("id", id)
+        .first();
+
+      return { user: user ?? null };
+    } catch (error) {
+      return { user: null, error };
     }
   }
 
@@ -302,6 +316,50 @@ export class Teams {
       return { team };
     } catch (error) {
       return { team: null, error };
+    }
+  }
+}
+
+export class Roles {
+  static async assignRole(roleObj: AssignRoleInput & { userId: string }) {
+    try {
+      const [assignment] = await db("user_roles")
+        .insert({
+          user_id: roleObj.userId,
+          role: roleObj.role,
+          team_id: roleObj.teamId ?? null,
+        })
+        .returning(["id", "user_id", "role", "team_id", "created_at"]);
+
+      return { assignment };
+    } catch (error) {
+      if ((error as { code?: string }).code === "23505") {
+        return { assignment: null, duplicate: true };
+      }
+      return { assignment: null, error };
+    }
+  }
+
+  static async revokeRole(userId: string, id: string) {
+    try {
+      const record = await db("user_roles").where("id", id).first();
+
+      if (!record) {
+        return { assignment: null, error: "Role does not exist" };
+      }
+
+      if (record.user_id !== userId) {
+        return { assignment: null, error: "User does not have the specified role" };
+      }
+
+      const [assignment] = await db("user_roles")
+        .where("id", id)
+        .del()
+        .returning(["id", "user_id", "role", "team_id"]);
+
+      return { assignment };
+    } catch (error) {
+      return { assignment: null, error };
     }
   }
 }

@@ -33,3 +33,14 @@ export const createTeamSchema = Joi.object({
 export const updateTeamSchema = Joi.object({
   name: teamNameSchema,
 });
+
+export const assignRoleSchema = Joi.object({
+  role: Joi.string()
+    .valid("super_admin", "hr_admin", "manager", "employee")
+    .required(),
+  teamId: Joi.string().uuid().optional(),
+});
+
+export const revokeRoleParamsSchema = Joi.object({
+  roleId: Joi.string().uuid().required(),
+});

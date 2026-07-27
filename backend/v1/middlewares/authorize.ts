@@ -27,6 +27,16 @@ export default function authorize() {
       },
       {
         method: "POST",
+        pattern: /^\/v1\/users\/[^/]+\/role$/,
+        roles: ["super_admin", "hr_admin"],
+      },
+      {
+        method: "POST",
+        pattern: /^\/v1\/users\/[^/]+\/role\/[^/]+$/,
+        roles: ["super_admin", "hr_admin"],
+      },
+      {
+        method: "POST",
         pattern: /^\/v1\/teams$/,
         roles: ["super_admin", "hr_admin"],
       },
