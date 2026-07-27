@@ -1,9 +1,15 @@
-import type { Request } from 'express';
+import type { Request } from "express";
+
+export type UserRoles = {
+  id: string;
+  role: "super_admin" | "hr_admin" | "manager" | "employee";
+  team_id: string | null;
+};
 
 export type AuthUser = {
   userId: string;
   email: string;
-  role?: string;
+  role?: UserRoles[] | [];
 };
 
 export type AuthenticatedRequest = Request & {
@@ -11,15 +17,9 @@ export type AuthenticatedRequest = Request & {
 };
 
 export type CreateUserInput = {
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
-  phone: string;
   passwordHash: string;
-  username: string;
-  role?: string;
-  isVerified?: string;
-  isActive?: boolean;
 };
 
 export type UpdateUserPasswordInput = {
@@ -31,10 +31,10 @@ export type UserLookupResult = {
   userId?: string;
   email?: string;
   passwordHash?: string;
-  role?: string;
+  role?: UserRoles[];
 };
 
-export type JwtTokenType = 'all' | 'forgotPassword' | 'refreshToken' | 'token';
+export type JwtTokenType = "all" | "forgotPassword" | "refreshToken" | "token";
 
 export type PasswordResetMail = {
   to: string;
@@ -45,8 +45,8 @@ export type PasswordResetMail = {
 
 export type PublicRoute = {
   method: string;
-  pattern: any
-}
+  pattern: any;
+};
 
 export type PaginationInput = {
   page?: number;
