@@ -11,7 +11,51 @@ import type {
   UserFilters,
   PaginationInput,
   AssignRoleInput,
+  CreateEmployeeInput,
+  UpdateEmployeeInput,
+  EmployeeFilters,
+  AuthUser,
 } from "../../types.js";
+
+const EMPLOYEE_COLUMNS = [
+  "id",
+  "user_id",
+  "job_title",
+  "team_id",
+  "manager_id",
+  "updated_by",
+  "start_date",
+  "salary",
+  "employment_type",
+  "resume",
+  "phone",
+  "profile_picture",
+  "national_id",
+  "is_active",
+  "deleted",
+  "created_at",
+  "updated_at",
+];
+
+const SENSITIVE_EMPLOYEE_FIELDS = ["salary", "resume", "national_id"];
+
+export function sanitizeEmployee<T extends Record<string, unknown>>(
+  employee: T,
+  requester: AuthUser,
+): T {
+  const privileged = requester.role?.some(
+    (r) => r.role === "super_admin" || r.role === "hr_admin",
+  );
+  const isSelf = employee["user_id"] === requester.userId;
+
+  if (privileged || isSelf) return employee;
+
+  const sanitized = { ...employee };
+  for (const field of SENSITIVE_EMPLOYEE_FIELDS) {
+    delete sanitized[field];
+  }
+  return sanitized;
+}
 
 export class Users {
   static async getAllUsers({
@@ -167,7 +211,14 @@ export class Users {
       const [user] = await db("users")
         .where("id", id)
         .update(userObj)
-        .returning(["id", "name", "email", "status", "created_at", "updated_at"]);
+        .returning([
+          "id",
+          "name",
+          "email",
+          "status",
+          "created_at",
+          "updated_at",
+        ]);
 
       if (!user) {
         return { user: null, error: "User not found" };
@@ -349,7 +400,10 @@ export class Roles {
       }
 
       if (record.user_id !== userId) {
-        return { assignment: null, error: "User does not have the specified role" };
+        return {
+          assignment: null,
+          error: "User does not have the specified role",
+        };
       }
 
       const [assignment] = await db("user_roles")
@@ -360,6 +414,173 @@ export class Roles {
       return { assignment };
     } catch (error) {
       return { assignment: null, error };
+    }
+  }
+}
+
+export class Employees {
+  static async createEmployee(
+    employeeObj: CreateEmployeeInput & { updatedBy: string },
+  ) {
+    try {
+      const [employee] = await db("employees")
+        .insert({
+          user_id: employeeObj.userId,
+          job_title: employeeObj.jobTitle,
+          team_id: employeeObj.teamId,
+          manager_id: employeeObj.managerId ?? null,
+          updated_by: employeeObj.updatedBy,
+          start_date: employeeObj.startDate,
+          salary: employeeObj.salary,
+          employment_type: employeeObj.employmentType,
+          resume: employeeObj.resume ?? null,
+          phone: employeeObj.phone ?? null,
+          profile_picture: employeeObj.profilePicture ?? null,
+          national_id: employeeObj.nationalId ?? null,
+        })
+        .returning(EMPLOYEE_COLUMNS);
+
+      return { employee };
+    } catch (error) {
+      return { employee: null, error };
+    }
+  }
+
+  static async getAllEmployees({
+    page,
+    limit,
+    team,
+    manager,
+    employmentType,
+    isActive,
+    search,
+  }: PaginationInput & EmployeeFilters) {
+    try {
+      const employeesQuery = db("employees").select(EMPLOYEE_COLUMNS);
+      employeesQuery.where("deleted", false);
+      if (team) employeesQuery.where("team_id", team);
+      if (manager) employeesQuery.where("manager_id", manager);
+      if (employmentType)
+        employeesQuery.where("employment_type", employmentType);
+      if (isActive !== undefined) employeesQuery.where("is_active", isActive);
+      if (search) employeesQuery.where("job_title", "ilike", `%${search}%`);
+
+      if (page !== undefined || limit !== undefined) {
+        const resolvedPage = page ?? 1;
+        const resolvedLimit = limit ?? 10;
+        const offset = (resolvedPage - 1) * resolvedLimit;
+
+        const employees = await employeesQuery
+          .limit(resolvedLimit)
+          .offset(offset)
+          .orderBy("id");
+
+        const totalQuery = db("employees");
+        totalQuery.where("deleted", false);
+        if (team) totalQuery.where("team_id", team);
+        if (manager) totalQuery.where("manager_id", manager);
+        if (employmentType) totalQuery.where("employment_type", employmentType);
+        if (isActive !== undefined) totalQuery.where("is_active", isActive);
+        if (search) totalQuery.where("job_title", "ilike", `%${search}%`);
+        const total = await totalQuery.count("* as total");
+
+        return {
+          employees,
+          pagination: {
+            page: resolvedPage,
+            limit: resolvedLimit,
+            total: total && total[0] && Number(total[0].total),
+            pages:
+              total &&
+              total[0] &&
+              Math.ceil(Number(total[0].total) / resolvedLimit),
+          },
+        };
+      }
+
+      const employees = await employeesQuery.orderBy("id");
+
+      return { employees, pagination: null };
+    } catch (error) {
+      return { employees: [], pagination: null, error };
+    }
+  }
+
+  static async getEmployeeById(id: string) {
+    try {
+      const employee = await db("employees")
+        .select(EMPLOYEE_COLUMNS)
+        .where("id", id)
+        .where("deleted", false)
+        .first();
+
+      return { employee: employee ?? null };
+    } catch (error) {
+      return { employee: null, error };
+    }
+  }
+
+  static async updateEmployee(
+    id: string,
+    employeeObj: UpdateEmployeeInput & { updatedBy: string },
+  ) {
+    try {
+      const updatePayload: Record<string, unknown> = {
+        updated_by: employeeObj.updatedBy,
+      };
+
+      if (employeeObj.jobTitle !== undefined)
+        updatePayload["job_title"] = employeeObj.jobTitle;
+      if (employeeObj.teamId !== undefined)
+        updatePayload["team_id"] = employeeObj.teamId;
+      if (employeeObj.managerId !== undefined)
+        updatePayload["manager_id"] = employeeObj.managerId;
+      if (employeeObj.startDate !== undefined)
+        updatePayload["start_date"] = employeeObj.startDate;
+      if (employeeObj.salary !== undefined)
+        updatePayload["salary"] = employeeObj.salary;
+      if (employeeObj.employmentType !== undefined)
+        updatePayload["employment_type"] = employeeObj.employmentType;
+      if (employeeObj.resume !== undefined)
+        updatePayload["resume"] = employeeObj.resume;
+      if (employeeObj.phone !== undefined)
+        updatePayload["phone"] = employeeObj.phone;
+      if (employeeObj.profilePicture !== undefined)
+        updatePayload["profile_picture"] = employeeObj.profilePicture;
+      if (employeeObj.nationalId !== undefined)
+        updatePayload["national_id"] = employeeObj.nationalId;
+
+      const [employee] = await db("employees")
+        .where("id", id)
+        .where("deleted", false)
+        .update(updatePayload)
+        .returning(EMPLOYEE_COLUMNS);
+
+      if (!employee) {
+        return { employee: null, error: "Employee not found" };
+      }
+
+      return { employee };
+    } catch (error) {
+      return { employee: null, error };
+    }
+  }
+
+  static async deactivateEmployee(id: string, updatedBy: string) {
+    try {
+      const [employee] = await db("employees")
+        .where("id", id)
+        .where("deleted", false)
+        .update({ is_active: false, updated_by: updatedBy })
+        .returning(EMPLOYEE_COLUMNS);
+
+      if (!employee) {
+        return { employee: null, error: "Employee not found" };
+      }
+
+      return { employee };
+    } catch (error) {
+      return { employee: null, error };
     }
   }
 }
