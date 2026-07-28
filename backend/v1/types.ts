@@ -185,3 +185,26 @@ export type LeaveBalanceFilters = {
   leaveTypeId?: string | undefined;
   year?: number | undefined;
 };
+
+export type CreatePayslipInput = {
+  employeeId: EmployeeId;
+  periodMonth: number;
+  periodYear: number;
+  grossPay: number;
+  unpaidLeaveDays: number;
+  nssf: number;
+  shif: number;
+  ahl: number;
+  paye: number;
+  netPay: number;
+  version: number;
+  generatedAt: string;
+  generatedBy: UserId;
+};
+
+export type PayslipFilters = {
+  employeeId?: EmployeeId | undefined;
+  periodMonth?: number | undefined;
+  periodYear?: number | undefined;
+  payslipId?: string | undefined;
+};

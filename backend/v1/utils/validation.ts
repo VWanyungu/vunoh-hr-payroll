@@ -144,3 +144,20 @@ export const leaveBalanceQuerySchema = Joi.object({
   leaveTypeId: uuidSchema.optional(),
   year: yearSchema.optional(),
 });
+
+const monthSchema = Joi.number().integer().min(1).max(12);
+
+export const payslipQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).optional(),
+  limit: Joi.number().integer().min(1).optional(),
+  employeeId: uuidSchema.optional(),
+  periodMonth: monthSchema.optional(),
+  periodYear: yearSchema.optional(),
+  payslipId: uuidSchema.optional(),
+});
+
+export const latestPayslipQuerySchema = Joi.object({
+  employeeId: uuidSchema.optional(),
+  periodMonth: monthSchema.required(),
+  periodYear: yearSchema.required(),
+});
