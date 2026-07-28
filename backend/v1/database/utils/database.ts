@@ -737,6 +737,24 @@ export class Employees {
       return { employee: null, error };
     }
   }
+
+  static async softDeleteEmployee(id: string, updatedBy: UserId) {
+    try {
+      const [employee] = await db("employees")
+        .where("id", id)
+        .where("deleted", false)
+        .update({ deleted: true, updated_by: updatedBy })
+        .returning(EMPLOYEE_COLUMNS);
+
+      if (!employee) {
+        return { employee: null, error: "Employee not found" };
+      }
+
+      return { employee };
+    } catch (error) {
+      return { employee: null, error };
+    }
+  }
 }
 
 // Auth carries a UserId (req.user.userId); most leave-domain queries need the
