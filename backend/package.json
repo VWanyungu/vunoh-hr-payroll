@@ -10,7 +10,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "jest",
+    "test": "jest --runInBand",
     "test:watch": "jest --watch"
   },
   "type": "module",
@@ -46,6 +46,7 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^26.1.1",
     "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.1",
     "jest": "^30.4.2",
     "jsdom": "^29.1.1",
