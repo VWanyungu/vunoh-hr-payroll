@@ -75,6 +75,21 @@ export default function authorize() {
         pattern: /^\/v1\/employees\/[^/]+\/deactivate$/,
         roles: ["super_admin", "hr_admin"],
       },
+      {
+        method: "POST",
+        pattern: /^\/v1\/leave-requests\/[^/]+\/approve$/,
+        roles: ["super_admin", "hr_admin", "manager"],
+      },
+      {
+        method: "POST",
+        pattern: /^\/v1\/leave-requests\/[^/]+\/reject$/,
+        roles: ["super_admin", "hr_admin", "manager"],
+      },
+      {
+        method: "POST",
+        pattern: /^\/v1\/leave-balances$/,
+        roles: ["super_admin", "hr_admin"],
+      },
     ];
 
     const matchedRoute = protectedRoutes.find(

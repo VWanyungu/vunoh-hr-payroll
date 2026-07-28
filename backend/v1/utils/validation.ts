@@ -97,3 +97,50 @@ export const employeeQuerySchema = Joi.object({
   isActive: Joi.boolean().optional(),
   search: Joi.string().trim().optional(),
 });
+
+const leaveRequestStatusSchema = Joi.string().valid(
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+);
+
+export const createLeaveRequestSchema = Joi.object({
+  employeeId: uuidSchema.optional(),
+  leaveTypeId: uuidSchema.required(),
+  startDate: Joi.date().iso().required(),
+  endDate: Joi.date().iso().min(Joi.ref("startDate")).required(),
+  coverEmployeeId: uuidSchema.optional(),
+});
+
+export const updateLeaveRequestSchema = Joi.object({
+  leaveTypeId: uuidSchema.optional(),
+  startDate: Joi.date().iso().optional(),
+  endDate: Joi.date().iso().optional(),
+  coverEmployeeId: uuidSchema.optional(),
+}).min(1);
+
+export const leaveRequestQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).optional(),
+  limit: Joi.number().integer().min(1).optional(),
+  employeeId: uuidSchema.optional(),
+  status: leaveRequestStatusSchema.optional(),
+});
+
+const yearSchema = Joi.number().integer().min(2000).max(2100);
+const allocatedSchema = Joi.number().integer().min(0);
+
+export const createLeaveBalanceSchema = Joi.object({
+  employeeId: uuidSchema.required(),
+  leaveTypeId: uuidSchema.required(),
+  year: yearSchema.required(),
+  allocated: allocatedSchema.required(),
+});
+
+export const leaveBalanceQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).optional(),
+  limit: Joi.number().integer().min(1).optional(),
+  employeeId: uuidSchema.optional(),
+  leaveTypeId: uuidSchema.optional(),
+  year: yearSchema.optional(),
+});
