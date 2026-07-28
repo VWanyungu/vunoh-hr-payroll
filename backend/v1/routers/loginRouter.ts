@@ -2,7 +2,7 @@ import express from "express";
 import { Users } from "../database/utils/database.js";
 import generateJwtToken from "../utils/generateJwtToken.js";
 import bcrypt from "bcrypt";
-import type { AuthUser } from "../types.js";
+import type { AuthUser, UserId } from "../types.js";
 import { Tokens } from "../database/utils/database.js";
 
 const router = express.Router();
@@ -26,7 +26,7 @@ router.post("/", async (req, res) => {
     }
 
     const payload: AuthUser = {
-      userId: user.userId,
+      userId: user.userId as UserId,
       email: user.email,
       role: user.role ? user.role : [],
     };

@@ -1,5 +1,14 @@
 import type { Request } from "express";
 
+// `UserId` identifies a login/auth identity (the `users` table); `EmployeeId`
+// identifies an HR profile (the `employees` table). They are related by a 1:1
+// FK (`employees.user_id` -> `users.id`) but are not interchangeable: leave
+// requests/balances are owned by an EmployeeId, while approvers, roles, and
+// audit (`updated_by`) fields are a UserId. Branding them as distinct string
+// types makes mixing them up a compile error instead of a runtime bug.
+export type UserId = string & { readonly __brand: "UserId" };
+export type EmployeeId = string & { readonly __brand: "EmployeeId" };
+
 export type UserRoles = {
   id: string;
   role: "super_admin" | "hr_admin" | "manager" | "employee";
@@ -7,7 +16,7 @@ export type UserRoles = {
 };
 
 export type AuthUser = {
-  userId: string;
+  userId: UserId;
   email: string;
   role?: UserRoles[] | [];
 };
@@ -93,7 +102,7 @@ export type AssignRoleInput = {
 export type EmploymentType = "full_time" | "contract";
 
 export type CreateEmployeeInput = {
-  userId: string;
+  userId: UserId;
   jobTitle: string;
   teamId: string;
   managerId?: string;
@@ -130,37 +139,37 @@ export type EmployeeFilters = {
 export type LeaveRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export type CreateLeaveRequestInput = {
-  employeeId?: string;
+  employeeId?: EmployeeId;
   leaveTypeId: string;
   startDate: string;
   endDate: string;
-  coverEmployeeId?: string;
+  coverEmployeeId?: EmployeeId;
 };
 
 export type UpdateLeaveRequestInput = {
   leaveTypeId?: string;
   startDate?: string;
   endDate?: string;
-  coverEmployeeId?: string;
+  coverEmployeeId?: EmployeeId;
 };
 
 export type LeaveRequestFilters = {
-  employeeId?: string | undefined;
+  employeeId?: EmployeeId | undefined;
   status?: LeaveRequestStatus | undefined;
 };
 
 export type LeaveRequestScope =
   | { type: "all" }
-  | { type: "own"; employeeId: string }
-  | { type: "managed"; managerEmployeeId: string };
+  | { type: "own"; employeeId: EmployeeId }
+  | { type: "managed"; managerEmployeeId: EmployeeId };
 
 export type DecideLeaveRequestInput = {
   status: "approved" | "rejected";
-  approverId: string;
+  approverId: UserId;
 };
 
 export type CreateLeaveBalanceInput = {
-  employeeId: string;
+  employeeId: EmployeeId;
   leaveTypeId: string;
   year: number;
   allocated: number;
@@ -172,7 +181,7 @@ export type UpdateLeaveBalanceInput = {
 };
 
 export type LeaveBalanceFilters = {
-  employeeId?: string | undefined;
+  employeeId?: EmployeeId | undefined;
   leaveTypeId?: string | undefined;
   year?: number | undefined;
 };
