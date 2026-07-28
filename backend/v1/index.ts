@@ -12,6 +12,7 @@ import employeesRouter from "./routers/employeesRouter.js";
 import leaveTypesRouter from "./routers/leaveTypesRouter.js";
 import leaveRequestsRouter from "./routers/leaveRequestsRouter.js";
 import leaveBalancesRouter from "./routers/leaveBalancesRouter.js";
+import payslipsRouter from "./routers/payslipsRouter.js";
 
 import { authLimiter } from "../middlewares/rateLimit.js";
 
@@ -26,6 +27,7 @@ router.use("/v1/employees", employeesRouter);
 router.use("/v1/leave-types", leaveTypesRouter);
 router.use("/v1/leave-requests", leaveRequestsRouter);
 router.use("/v1/leave-balances", leaveBalancesRouter);
+router.use("/v1/payslips", payslipsRouter);
 router.use("/v1/signup", authLimiter, usersRouter);
 router.use("/v1/login", authLimiter, loginRouter);
 router.use("/v1/reset-password", authLimiter, resetUserPasswordRouter);
