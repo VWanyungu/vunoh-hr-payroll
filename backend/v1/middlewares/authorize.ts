@@ -81,6 +81,11 @@ export default function authorize() {
         roles: ["super_admin", "hr_admin"],
       },
       {
+        method: "DELETE",
+        pattern: /^\/v1\/employees\/[^/]+$/,
+        roles: ["super_admin", "hr_admin"],
+      },
+      {
         method: "POST",
         pattern: /^\/v1\/leave-requests\/[^/]+\/approve$/,
         roles: ["super_admin", "hr_admin", "manager"],

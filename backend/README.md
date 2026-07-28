@@ -103,6 +103,7 @@ See `.env.example` for a filled-in starting point for local development.
 - Self-service updates (via the employee themself) are limited to `resume`, `phone`, and `profilePicture` — only `super_admin`/`hr_admin`/`manager` can change `salary`, `teamId`, `managerId`, `employmentType`, `startDate`, or `jobTitle`.
 - New employee records default to `is_active: true`.
 - Activating/deactivating an employee (`POST /v1/employees/:id/activate` / `POST /v1/employees/:id/deactivate`) is restricted to `super_admin`/`hr_admin`.
+- Soft-deleting an employee (`DELETE /v1/employees/:id`) is restricted to `super_admin`/`hr_admin` — it sets `deleted: true` rather than removing the row, and the record is then excluded from all reads, updates, and payroll runs.
 
 ### Authorization matrix (`v1/middlewares/authorize.ts`)
 
@@ -114,6 +115,7 @@ See `.env.example` for a filled-in starting point for local development.
 | List all employees                             | `super_admin`, `hr_admin`, `manager`                                                                   |
 | View / create / update a single employee       | `super_admin`, `hr_admin`, `manager`, `employee` (self-service fields only for `employee` — see above) |
 | Activate / deactivate an employee              | `super_admin`, `hr_admin`                                                                              |
+| Soft-delete an employee                        | `super_admin`, `hr_admin`                                                                              |
 | Approve / reject a leave request               | `super_admin`, `hr_admin`, `manager`                                                                   |
 | Create a leave balance                         | `super_admin`, `hr_admin`                                                                              |
 | Trigger a payroll run                          | `super_admin`, `hr_admin`                                                                              |

@@ -344,4 +344,35 @@ router.post("/:employeeId/activate", async (req, res) => {
   }
 });
 
+router.delete("/:employeeId", async (req, res) => {
+  const user = (req as AuthenticatedRequest).user;
+
+  try {
+    const response = await Employees.softDeleteEmployee(
+      req.params.employeeId,
+      user!.userId,
+    );
+
+    if (!response.employee) {
+      return res.status(404).json({
+        status: "error",
+        data: null,
+        message: "Employee not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: { response: { employee: response.employee } },
+      message: "Employee deleted successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      data: null,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
 export default router;
