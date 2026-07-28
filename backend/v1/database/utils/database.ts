@@ -22,6 +22,8 @@ import type {
   CreateLeaveBalanceInput,
   UpdateLeaveBalanceInput,
   LeaveBalanceFilters,
+  UserId,
+  EmployeeId,
 } from "../../types.js";
 
 const EMPLOYEE_COLUMNS = [
@@ -423,7 +425,7 @@ export class PublicHolidays {
 }
 
 export class Roles {
-  static async assignRole(roleObj: AssignRoleInput & { userId: string }) {
+  static async assignRole(roleObj: AssignRoleInput & { userId: UserId }) {
     try {
       const [assignment] = await db("user_roles")
         .insert({
@@ -442,7 +444,7 @@ export class Roles {
     }
   }
 
-  static async revokeRole(userId: string, id: string) {
+  static async revokeRole(userId: UserId, id: string) {
     try {
       const record = await db("user_roles").where("id", id).first();
 
@@ -467,11 +469,37 @@ export class Roles {
       return { assignment: null, error };
     }
   }
+
+  static async getTeamManagerUserId(teamId: string) {
+    try {
+      const row = await db("user_roles")
+        .where({ role: "manager", team_id: teamId })
+        .orderBy("created_at", "asc")
+        .first();
+
+      return { userId: (row?.user_id as UserId) ?? null };
+    } catch (error) {
+      return { userId: null, error };
+    }
+  }
+
+  static async getHrAdminUserId() {
+    try {
+      const row = await db("user_roles")
+        .where({ role: "hr_admin" })
+        .orderBy("created_at", "asc")
+        .first();
+
+      return { userId: (row?.user_id as UserId) ?? null };
+    } catch (error) {
+      return { userId: null, error };
+    }
+  }
 }
 
 export class Employees {
   static async createEmployee(
-    employeeObj: CreateEmployeeInput & { updatedBy: string },
+    employeeObj: CreateEmployeeInput & { updatedBy: UserId },
   ) {
     try {
       return await db.transaction(async (trx) => {
@@ -592,7 +620,7 @@ export class Employees {
     }
   }
 
-  static async getEmployeeByUserId(userId: string) {
+  static async getEmployeeByUserId(userId: UserId) {
     try {
       const employee = await db("employees")
         .select(EMPLOYEE_COLUMNS)
@@ -608,7 +636,7 @@ export class Employees {
 
   static async updateEmployee(
     id: string,
-    employeeObj: UpdateEmployeeInput & { updatedBy: string },
+    employeeObj: UpdateEmployeeInput & { updatedBy: UserId },
   ) {
     try {
       const updatePayload: Record<string, unknown> = {
@@ -652,7 +680,7 @@ export class Employees {
     }
   }
 
-  static async deactivateEmployee(id: string, updatedBy: string) {
+  static async deactivateEmployee(id: string, updatedBy: UserId) {
     try {
       const [employee] = await db("employees")
         .where("id", id)
@@ -669,6 +697,14 @@ export class Employees {
       return { employee: null, error };
     }
   }
+}
+
+// Auth carries a UserId (req.user.userId); most leave-domain queries need the
+// caller's EmployeeId instead. Centralizes that UserId -> employee row hop so
+// routers don't each re-run Employees.getEmployeeByUserId themselves.
+export async function resolveEmployeeForUser(user: AuthUser) {
+  const { employee } = await Employees.getEmployeeByUserId(user.userId);
+  return employee ?? null;
 }
 
 const LEAVE_REQUEST_COLUMNS = [
@@ -776,8 +812,9 @@ export class LeaveRequests {
 
   static async createLeaveRequest(
     input: CreateLeaveRequestInput & {
-      employeeId: string;
+      employeeId: EmployeeId;
       workingDaysCount: number;
+      approverId?: UserId | null;
     },
   ) {
     try {
@@ -790,6 +827,7 @@ export class LeaveRequests {
           working_days_count: input.workingDaysCount,
           status: "pending",
           cover_employee_id: input.coverEmployeeId ?? null,
+          approver_id: input.approverId ?? null,
           requested_at: db.fn.now(),
         })
         .returning(LEAVE_REQUEST_COLUMNS);
@@ -832,7 +870,7 @@ export class LeaveRequests {
 
   static async decideLeaveRequest(
     id: string,
-    decision: { status: "approved" | "rejected"; approverId: string },
+    decision: { status: "approved" | "rejected"; approverId: UserId },
   ) {
     try {
       const [leaveRequest] = await db("leave_requests")
@@ -863,7 +901,7 @@ export class LeaveRequests {
   // same transaction as the status change, so a request is never marked
   // approved without its balance being reflected. "unpaid" leave types are not
   // tracked in leave_balances and skip the deduction step entirely.
-  static async approveLeaveRequest(id: string, approverId: string) {
+  static async approveLeaveRequest(id: string, approverId: UserId) {
     try {
       return await db.transaction(async (trx) => {
         const leaveRequest = await trx("leave_requests")
@@ -1022,6 +1060,31 @@ export class LeaveBalances {
       const leaveBalance = await db("leave_balances")
         .select(LEAVE_BALANCE_COLUMNS)
         .where("id", id)
+        .first();
+
+      return { leaveBalance: leaveBalance ?? null };
+    } catch (error) {
+      return { leaveBalance: null, error };
+    }
+  }
+
+  static async getLeaveBalance({
+    employeeId,
+    leaveTypeId,
+    year,
+  }: {
+    employeeId: EmployeeId;
+    leaveTypeId: string;
+    year: number;
+  }) {
+    try {
+      const leaveBalance = await db("leave_balances")
+        .select(LEAVE_BALANCE_COLUMNS)
+        .where({
+          employee_id: employeeId,
+          leave_type_id: leaveTypeId,
+          year,
+        })
         .first();
 
       return { leaveBalance: leaveBalance ?? null };
