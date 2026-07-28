@@ -90,6 +90,11 @@ export default function authorize() {
         pattern: /^\/v1\/leave-balances$/,
         roles: ["super_admin", "hr_admin"],
       },
+      {
+        method: "POST",
+        pattern: /^\/v1\/payroll-runs$/,
+        roles: ["super_admin", "hr_admin"],
+      },
     ];
 
     const matchedRoute = protectedRoutes.find(

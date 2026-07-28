@@ -161,3 +161,8 @@ export const latestPayslipQuerySchema = Joi.object({
   periodMonth: monthSchema.required(),
   periodYear: yearSchema.required(),
 });
+
+export const initiatePayrollRunSchema = Joi.object({
+  periodMonth: monthSchema.required(),
+  periodYear: yearSchema.required(),
+});
