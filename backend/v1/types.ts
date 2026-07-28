@@ -74,6 +74,13 @@ export type TeamFilters = {
   name?: string | undefined;
 };
 
+export type LeaveTypeCode = "annual" | "sick" | "unpaid";
+
+export type LeaveTypeFilters = {
+  id?: string | undefined;
+  code?: LeaveTypeCode | undefined;
+};
+
 export type UserFilters = {
   status?: UserStatus | undefined;
 };
