@@ -278,7 +278,7 @@ router.post("/", async (req: AuthenticatedRequest, res) => {
       });
     }
 
-    res.status(200).json({
+    res.status(201).json({
       status: "success",
       data: { response: { leaveRequest: response.leaveRequest } },
       message: "Leave request created successfully",
