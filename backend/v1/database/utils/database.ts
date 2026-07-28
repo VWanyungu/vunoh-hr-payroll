@@ -1065,6 +1065,31 @@ export class LeaveRequests {
       return { unpaidLeaveDays: 0, error };
     }
   }
+
+  static async getApprovedOverlappingEmployeeIds({
+    employeeIds,
+    startDate,
+    endDate,
+  }: {
+    employeeIds: EmployeeId[];
+    startDate: string;
+    endDate: string;
+  }) {
+    try {
+      if (employeeIds.length === 0) return { employeeIds: [] };
+
+      const rows = await db("leave_requests")
+        .distinct("employee_id")
+        .whereIn("employee_id", employeeIds)
+        .where("status", "approved")
+        .where("start_date", "<=", endDate)
+        .where("end_date", ">=", startDate);
+
+      return { employeeIds: rows.map((r) => r.employee_id as EmployeeId) };
+    } catch (error) {
+      return { employeeIds: [], error };
+    }
+  }
 }
 
 const LEAVE_BALANCE_COLUMNS = [
