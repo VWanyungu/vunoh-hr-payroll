@@ -8,6 +8,7 @@ import {
   resolveEmployeeForUser,
 } from "../database/utils/database.js";
 import { submitLeaveRequest } from "../utils/leave/submitLeaveRequest.js";
+import { checkTeamCoverage } from "../utils/leave/checkTeamCoverage.js";
 import { countWorkingDays } from "../utils/leave/workingDays.js";
 import { buildPagination } from "../utils/pagination.js";
 import {
@@ -133,12 +134,9 @@ router.get("/:id", async (req, res) => {
 
     const employee = await resolveEmployeeForUser(user!);
     const isSelf = employee?.id === leaveRequest.employee_id;
+    const managing = await isManagerOf(user, leaveRequest.employee_id);
 
-    if (
-      !isPrivileged(user) &&
-      !isSelf &&
-      !(await isManagerOf(user, leaveRequest.employee_id))
-    ) {
+    if (!isPrivileged(user) && !isSelf && !managing) {
       return res.status(403).json({
         status: "error",
         data: null,
@@ -146,9 +144,24 @@ router.get("/:id", async (req, res) => {
       });
     }
 
+    let teamCoverage = null;
+
+    if (
+      (managing || isPrivileged(user)) &&
+      !isSelf &&
+      leaveRequest.status === "pending"
+    ) {
+      teamCoverage = await checkTeamCoverage({
+        employeeId: leaveRequest.employee_id,
+        startDate: leaveRequest.start_date,
+        endDate: leaveRequest.end_date,
+        workingDaysCount: leaveRequest.working_days_count,
+      });
+    }
+
     res.status(200).json({
       status: "success",
-      data: { response: { leaveRequest } },
+      data: { response: { leaveRequest, teamCoverage } },
       message: "Leave request retrieved successfully",
     });
   } catch (err) {
