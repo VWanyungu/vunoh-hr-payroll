@@ -313,4 +313,35 @@ router.post("/:employeeId/deactivate", async (req, res) => {
   }
 });
 
+router.post("/:employeeId/activate", async (req, res) => {
+  const user = (req as AuthenticatedRequest).user;
+
+  try {
+    const response = await Employees.activateEmployee(
+      req.params.employeeId,
+      user!.userId,
+    );
+
+    if (!response.employee) {
+      return res.status(404).json({
+        status: "error",
+        data: null,
+        message: "Employee not found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: { response: { employee: response.employee } },
+      message: "Employee activated successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      data: null,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
 export default router;

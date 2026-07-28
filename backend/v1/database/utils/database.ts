@@ -512,6 +512,7 @@ export class Employees {
             phone: employeeObj.phone ?? null,
             profile_picture: employeeObj.profilePicture ?? null,
             national_id: employeeObj.nationalId ?? null,
+            is_active: true,
           })
           .returning(EMPLOYEE_COLUMNS);
 
@@ -707,6 +708,24 @@ export class Employees {
         .where("id", id)
         .where("deleted", false)
         .update({ is_active: false, updated_by: updatedBy })
+        .returning(EMPLOYEE_COLUMNS);
+
+      if (!employee) {
+        return { employee: null, error: "Employee not found" };
+      }
+
+      return { employee };
+    } catch (error) {
+      return { employee: null, error };
+    }
+  }
+
+  static async activateEmployee(id: string, updatedBy: UserId) {
+    try {
+      const [employee] = await db("employees")
+        .where("id", id)
+        .where("deleted", false)
+        .update({ is_active: true, updated_by: updatedBy })
         .returning(EMPLOYEE_COLUMNS);
 
       if (!employee) {
