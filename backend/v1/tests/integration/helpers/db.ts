@@ -6,6 +6,7 @@ import { seed as seedLeaveTypes } from "../../../seeds/test/04_leave_types.js";
 import { seed as seedLeaveBalances } from "../../../seeds/test/05_leave_balances.js";
 
 const FIXTURE_TABLES = [
+  "payslips",
   "leave_requests",
   "leave_balances",
   "employees",
