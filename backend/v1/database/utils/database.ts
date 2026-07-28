@@ -1,5 +1,7 @@
 import db from "../dbSetup.js";
 import { randomUUID } from "crypto";
+import { countWorkingDays } from "../../utils/leave/workingDays.js";
+import { getPeriodBounds } from "../../utils/payroll/period.js";
 import type {
   CreateUserInput,
   UpdateUserPasswordInput,
@@ -22,6 +24,8 @@ import type {
   CreateLeaveBalanceInput,
   UpdateLeaveBalanceInput,
   LeaveBalanceFilters,
+  CreatePayslipInput,
+  PayslipFilters,
   UserId,
   EmployeeId,
 } from "../../types.js";
@@ -606,6 +610,29 @@ export class Employees {
     }
   }
 
+  static async getActiveEmployeesForPeriod({
+    periodMonth,
+    periodYear,
+  }: {
+    periodMonth: number;
+    periodYear: number;
+  }) {
+    try {
+      const { periodEnd } = getPeriodBounds(periodMonth, periodYear);
+
+      const employees = await db("employees")
+        .select(EMPLOYEE_COLUMNS)
+        .where("deleted", false)
+        .where("is_active", true)
+        .where("start_date", "<=", periodEnd)
+        .orderBy("id");
+
+      return { employees };
+    } catch (error) {
+      return { employees: [], error };
+    }
+  }
+
   static async getEmployeeById(id: string) {
     try {
       const employee = await db("employees")
@@ -987,6 +1014,58 @@ export class LeaveRequests {
       return { leaveRequest: null, error };
     }
   }
+
+  // Overlapping requests are clipped in SQL (GREATEST/LEAST) to the period
+  // bounds before counting working days, so a request spanning outside the
+  // period only contributes the days that actually fall within it.
+  static async getApprovedUnpaidLeaveDays({
+    employeeId,
+    periodMonth,
+    periodYear,
+  }: {
+    employeeId: EmployeeId;
+    periodMonth: number;
+    periodYear: number;
+  }) {
+    try {
+      const { periodStart, periodEnd } = getPeriodBounds(
+        periodMonth,
+        periodYear,
+      );
+
+      const rows = await db("leave_requests as lr")
+        .join("leave_types as lt", "lt.id", "lr.leave_type_id")
+        .select(
+          db.raw("GREATEST(lr.start_date, ?::date) as clipped_start", [
+            periodStart,
+          ]),
+          db.raw("LEAST(lr.end_date, ?::date) as clipped_end", [periodEnd]),
+        )
+        .where("lr.employee_id", employeeId)
+        .where("lr.status", "approved")
+        .where("lt.code", "unpaid")
+        .where("lr.start_date", "<=", periodEnd)
+        .where("lr.end_date", ">=", periodStart);
+
+      if (rows.length === 0) return { unpaidLeaveDays: 0 };
+
+      const { holidayDates } = await PublicHolidays.getHolidayDatesInRange(
+        periodStart,
+        periodEnd,
+      );
+
+      const unpaidLeaveDays = rows.reduce(
+        (sum, row) =>
+          sum +
+          countWorkingDays(row.clipped_start, row.clipped_end, holidayDates),
+        0,
+      );
+
+      return { unpaidLeaveDays };
+    } catch (error) {
+      return { unpaidLeaveDays: 0, error };
+    }
+  }
 }
 
 const LEAVE_BALANCE_COLUMNS = [
@@ -1142,6 +1221,151 @@ export class LeaveBalances {
       return { leaveBalance };
     } catch (error) {
       return { leaveBalance: null, error };
+    }
+  }
+}
+
+const PAYSLIP_COLUMNS = [
+  "id",
+  "employee_id",
+  "period_month",
+  "period_year",
+  "gross_pay",
+  "unpaid_leave_days",
+  "nssf",
+  "shif",
+  "ahl",
+  "paye",
+  "net_pay",
+  "version",
+  "generated_at",
+  "generated_by",
+  "created_at",
+  "updated_at",
+];
+
+export class Payslips {
+  static async createPayslip(input: CreatePayslipInput, trx: typeof db = db) {
+    try {
+      const [payslip] = await trx("payslips")
+        .insert({
+          employee_id: input.employeeId,
+          period_month: input.periodMonth,
+          period_year: input.periodYear,
+          gross_pay: input.grossPay,
+          unpaid_leave_days: input.unpaidLeaveDays,
+          nssf: input.nssf,
+          shif: input.shif,
+          ahl: input.ahl,
+          paye: input.paye,
+          net_pay: input.netPay,
+          version: input.version,
+          generated_at: input.generatedAt,
+          generated_by: input.generatedBy,
+        })
+        .returning(PAYSLIP_COLUMNS);
+
+      return { payslip };
+    } catch (error) {
+      return { payslip: null, error };
+    }
+  }
+
+  static async getAllPayslips({
+    page,
+    limit,
+    employeeId,
+    periodMonth,
+    periodYear,
+    payslipId,
+  }: PaginationInput & PayslipFilters) {
+    try {
+      const query = db("payslips").select(PAYSLIP_COLUMNS);
+      if (employeeId) query.where("employee_id", employeeId);
+      if (periodMonth !== undefined) query.where("period_month", periodMonth);
+      if (periodYear !== undefined) query.where("period_year", periodYear);
+      if (payslipId) query.where("id", payslipId);
+
+      const order: {
+        column: string;
+        order: "desc";
+      }[] = [
+        { column: "period_year", order: "desc" },
+        { column: "period_month", order: "desc" },
+        { column: "version", order: "desc" },
+      ];
+
+      if (page !== undefined || limit !== undefined) {
+        const resolvedPage = page ?? 1;
+        const resolvedLimit = limit ?? 10;
+        const offset = (resolvedPage - 1) * resolvedLimit;
+
+        const payslips = await query
+          .limit(resolvedLimit)
+          .offset(offset)
+          .orderBy(order);
+
+        const totalQuery = db("payslips");
+        if (employeeId) totalQuery.where("employee_id", employeeId);
+        if (periodMonth !== undefined)
+          totalQuery.where("period_month", periodMonth);
+        if (periodYear !== undefined)
+          totalQuery.where("period_year", periodYear);
+        if (payslipId) totalQuery.where("id", payslipId);
+        const total = await totalQuery.count("* as total");
+
+        return {
+          payslips,
+          pagination: {
+            page: resolvedPage,
+            limit: resolvedLimit,
+            total: total && total[0] && Number(total[0].total),
+            pages:
+              total &&
+              total[0] &&
+              Math.ceil(Number(total[0].total) / resolvedLimit),
+          },
+        };
+      }
+
+      const payslips = await query.orderBy(order);
+
+      return {
+        payslips,
+        pagination: { page: null, limit: null, total: 0, pages: 0 },
+      };
+    } catch (error) {
+      return {
+        payslips: [],
+        pagination: { page: null, limit: null, total: 0, pages: 0 },
+        error,
+      };
+    }
+  }
+
+  static async getLatestPayslipForEmployee({
+    employeeId,
+    periodMonth,
+    periodYear,
+  }: {
+    employeeId: EmployeeId;
+    periodMonth: number;
+    periodYear: number;
+  }) {
+    try {
+      const payslip = await db("payslips")
+        .select(PAYSLIP_COLUMNS)
+        .where({
+          employee_id: employeeId,
+          period_month: periodMonth,
+          period_year: periodYear,
+        })
+        .orderBy("version", "desc")
+        .first();
+
+      return { payslip: payslip ?? null };
+    } catch (error) {
+      return { payslip: null, error };
     }
   }
 }
