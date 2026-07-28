@@ -36,7 +36,7 @@ export async function up(knex) {
       t.integer("default_allowance_days");
       t.boolean("prorate_on_join");
       t.integer("notice_days_required");
-      t.boolean("requires_cover");
+      t.boolean("requires_cover").defaultTo(false);
       t.timestamp("created_at", { useTz: true })
         .notNullable()
         .defaultTo(knex.fn.now());
