@@ -106,7 +106,7 @@ export default function authorize() {
     );
 
     if (!hasRole) {
-      return res.status(401).json({
+      return res.status(403).json({
         status: "fail",
         data: null,
         message: "You are not authorized to access this resource",
