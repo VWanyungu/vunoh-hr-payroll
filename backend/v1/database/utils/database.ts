@@ -15,6 +15,7 @@ import type {
   UpdateEmployeeInput,
   EmployeeFilters,
   AuthUser,
+  LeaveTypeFilters,
 } from "../../types.js";
 
 const EMPLOYEE_COLUMNS = [
@@ -367,6 +368,35 @@ export class Teams {
       return { team };
     } catch (error) {
       return { team: null, error };
+    }
+  }
+}
+
+const LEAVE_TYPE_COLUMNS = [
+  "id",
+  "code",
+  "name",
+  "default_allowance_days",
+  "prorate_on_join",
+  "notice_days_required",
+  "requires_cover",
+  "created_at",
+  "updated_at",
+];
+
+export class LeaveTypes {
+  static async getAllLeaveTypes({ id, code }: LeaveTypeFilters) {
+    try {
+      const query = db("leave_types").select(LEAVE_TYPE_COLUMNS);
+
+      if (id) query.where("id", id);
+      if (code) query.where("code", code);
+
+      const leaveTypes = await query.orderBy("id");
+
+      return { leaveTypes };
+    } catch (error) {
+      return { leaveTypes: [], error };
     }
   }
 }
