@@ -1,5 +1,5 @@
 // as of July 2026
-export default taxRates = {
+const taxRates = {
   PAYE_BANDS: [
     { upTo: 24000, rate: 0.1 },
     { upTo: 32333, rate: 0.25 },
@@ -16,3 +16,5 @@ export default taxRates = {
   SHIF_RATE: 0.0275,
   AHL_RATE: 0.015,
 };
+
+export default taxRates;
