@@ -2,6 +2,7 @@ import db from "../dbSetup.js";
 import { randomUUID } from "crypto";
 import { countWorkingDays } from "../../utils/leave/workingDays.js";
 import { getPeriodBounds } from "../../utils/payroll/period.js";
+import { buildPagination } from "../../utils/pagination.js";
 import type {
   CreateUserInput,
   UpdateUserPasswordInput,
@@ -125,22 +126,16 @@ export class Users {
 
       return {
         users,
-        pagination: {
+        pagination: buildPagination({
           page,
           limit,
           total: total && total[0] && Number(total[0].total),
-          pages: total && total[0] && Math.ceil(Number(total[0].total) / limit),
-        },
+        }),
       };
     } catch (error) {
       return {
         users: [],
-        pagination: {
-          page: 0,
-          limit: 0,
-          total: 0,
-          pages: 0,
-        },
+        pagination: buildPagination({ page, limit, total: 0 }),
         error,
       };
     }
@@ -304,23 +299,19 @@ export class Teams {
 
         return {
           teams,
-          pagination: {
+          pagination: buildPagination({
             page: resolvedPage,
             limit: resolvedLimit,
             total: total && total[0] && Number(total[0].total),
-            pages:
-              total &&
-              total[0] &&
-              Math.ceil(Number(total[0].total) / resolvedLimit),
-          },
+          }),
         };
       }
 
       const teams = await teamsQuery.orderBy("id");
 
-      return { teams, pagination: null };
+      return { teams, pagination: buildPagination({ total: teams.length }) };
     } catch (error) {
-      return { teams: [], pagination: null, error };
+      return { teams: [], pagination: buildPagination({ total: 0 }), error };
     }
   }
 
@@ -590,23 +581,26 @@ export class Employees {
 
         return {
           employees,
-          pagination: {
+          pagination: buildPagination({
             page: resolvedPage,
             limit: resolvedLimit,
             total: total && total[0] && Number(total[0].total),
-            pages:
-              total &&
-              total[0] &&
-              Math.ceil(Number(total[0].total) / resolvedLimit),
-          },
+          }),
         };
       }
 
       const employees = await employeesQuery.orderBy("id");
 
-      return { employees, pagination: null };
+      return {
+        employees,
+        pagination: buildPagination({ total: employees.length }),
+      };
     } catch (error) {
-      return { employees: [], pagination: null, error };
+      return {
+        employees: [],
+        pagination: buildPagination({ total: 0 }),
+        error,
+      };
     }
   }
 
@@ -801,15 +795,11 @@ export class LeaveRequests {
 
         return {
           leaveRequests,
-          pagination: {
+          pagination: buildPagination({
             page: resolvedPage,
             limit: resolvedLimit,
             total: total && total[0] && Number(total[0].total),
-            pages:
-              total &&
-              total[0] &&
-              Math.ceil(Number(total[0].total) / resolvedLimit),
-          },
+          }),
         };
       }
 
@@ -818,9 +808,16 @@ export class LeaveRequests {
         "desc",
       );
 
-      return { leaveRequests, pagination: null };
+      return {
+        leaveRequests,
+        pagination: buildPagination({ total: leaveRequests.length }),
+      };
     } catch (error) {
-      return { leaveRequests: [], pagination: null, error };
+      return {
+        leaveRequests: [],
+        pagination: buildPagination({ total: 0 }),
+        error,
+      };
     }
   }
 
@@ -1054,12 +1051,14 @@ export class LeaveRequests {
         periodEnd,
       );
 
-      const unpaidLeaveDays = rows.reduce(
-        (sum, row) =>
-          sum +
-          countWorkingDays(row.clipped_start, row.clipped_end, holidayDates),
-        0,
-      );
+      let unpaidLeaveDays = 0;
+      rows.forEach((row) => {
+        unpaidLeaveDays += countWorkingDays(
+          row.clipped_start,
+          row.clipped_end,
+          holidayDates,
+        );
+      });
 
       return { unpaidLeaveDays };
     } catch (error) {
@@ -1114,23 +1113,26 @@ export class LeaveBalances {
 
         return {
           leaveBalances,
-          pagination: {
+          pagination: buildPagination({
             page: resolvedPage,
             limit: resolvedLimit,
             total: total && total[0] && Number(total[0].total),
-            pages:
-              total &&
-              total[0] &&
-              Math.ceil(Number(total[0].total) / resolvedLimit),
-          },
+          }),
         };
       }
 
       const leaveBalances = await leaveBalancesQuery.orderBy("year", "desc");
 
-      return { leaveBalances, pagination: null };
+      return {
+        leaveBalances,
+        pagination: buildPagination({ total: leaveBalances.length }),
+      };
     } catch (error) {
-      return { leaveBalances: [], pagination: null, error };
+      return {
+        leaveBalances: [],
+        pagination: buildPagination({ total: 0 }),
+        error,
+      };
     }
   }
 
@@ -1316,15 +1318,11 @@ export class Payslips {
 
         return {
           payslips,
-          pagination: {
+          pagination: buildPagination({
             page: resolvedPage,
             limit: resolvedLimit,
             total: total && total[0] && Number(total[0].total),
-            pages:
-              total &&
-              total[0] &&
-              Math.ceil(Number(total[0].total) / resolvedLimit),
-          },
+          }),
         };
       }
 
@@ -1332,12 +1330,12 @@ export class Payslips {
 
       return {
         payslips,
-        pagination: { page: null, limit: null, total: 0, pages: 0 },
+        pagination: buildPagination({ total: payslips.length }),
       };
     } catch (error) {
       return {
         payslips: [],
-        pagination: { page: null, limit: null, total: 0, pages: 0 },
+        pagination: buildPagination({ total: 0 }),
         error,
       };
     }
