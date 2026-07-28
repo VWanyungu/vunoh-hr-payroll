@@ -15,6 +15,7 @@ import type {
   UpdateUserInput,
   UserStatus,
   AssignRoleInput,
+  UserId,
 } from "../types.js";
 
 router.get("/", async (req: AuthenticatedRequest, res) => {
@@ -242,7 +243,7 @@ router.post("/:userId/role", async (req, res) => {
     }
 
     const response = await Roles.assignRole({
-      userId: req.params.userId,
+      userId: req.params.userId as UserId,
       role: value.role,
       teamId: value.teamId,
     });
@@ -303,7 +304,10 @@ router.post("/:userId/role/:roleId", async (req, res) => {
       });
     }
 
-    const response = await Roles.revokeRole(req.params.userId, req.params.roleId);
+    const response = await Roles.revokeRole(
+      req.params.userId as UserId,
+      req.params.roleId,
+    );
 
     if (response.error === "Role does not exist") {
       return res.status(404).json({

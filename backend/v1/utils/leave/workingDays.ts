@@ -1,6 +1,6 @@
-type DateInput = Date | string;
+export type DateInput = Date | string;
 
-function toUTCDate(value: DateInput): Date {
+export function toUTCDate(value: DateInput): Date {
   const date = value instanceof Date ? value : new Date(value);
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }

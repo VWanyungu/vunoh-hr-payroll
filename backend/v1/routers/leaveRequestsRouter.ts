@@ -5,6 +5,7 @@ import {
   LeaveRequests,
   LeaveTypes,
   PublicHolidays,
+  resolveEmployeeForUser,
 } from "../database/utils/database.js";
 import { submitLeaveRequest } from "../utils/leave/submitLeaveRequest.js";
 import { countWorkingDays } from "../utils/leave/workingDays.js";
@@ -68,9 +69,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
     if (isPrivileged(req.user)) {
       scope = { type: "all" };
     } else {
-      const { employee } = await Employees.getEmployeeByUserId(
-        req.user!.userId,
-      );
+      const employee = await resolveEmployeeForUser(req.user!);
 
       if (!employee) {
         return res.status(200).json({
@@ -135,7 +134,7 @@ router.get("/:id", async (req, res) => {
       });
     }
 
-    const { employee } = await Employees.getEmployeeByUserId(user!.userId);
+    const employee = await resolveEmployeeForUser(user!);
     const isSelf = employee?.id === leaveRequest.employee_id;
 
     if (
@@ -173,9 +172,7 @@ router.post("/", async (req: AuthenticatedRequest, res) => {
     if (privileged && req.body.employeeId) {
       employeeId = req.body.employeeId;
     } else {
-      const { employee } = await Employees.getEmployeeByUserId(
-        req.user!.userId,
-      );
+      const employee = await resolveEmployeeForUser(req.user!);
       employeeId = employee?.id;
     }
 
@@ -226,6 +223,44 @@ router.post("/", async (req: AuthenticatedRequest, res) => {
     const response = await submitLeaveRequest({ ...value, employeeId });
 
     if (response.error) {
+      if (typeof response.error === "string") {
+        const errorMessages: Record<string, [number, string]> = {
+          employee_not_found: [400, "Employee not found"],
+          invalid_leave_type: [400, "Invalid leave type"],
+          insufficient_notice: [
+            400,
+            "Not enough notice given for this leave type",
+          ],
+          cover_required: [
+            400,
+            "A cover employee is required for this leave type",
+          ],
+          no_balance: [
+            400,
+            "No leave balance record found for this employee, leave type and year",
+          ],
+          insufficient_balance: [
+            400,
+            "Insufficient leave balance remaining for the requested period",
+          ],
+          no_approver_available: [
+            500,
+            "No approver could be determined for this leave request",
+          ],
+        };
+
+        const [code, message] = errorMessages[response.error] ?? [
+          500,
+          "Failed to create leave request",
+        ];
+
+        return res.status(code).json({
+          status: "error",
+          data: null,
+          message,
+        });
+      }
+
       const code = (response.error as { code?: string }).code;
 
       if (code === "23503") {
@@ -274,7 +309,7 @@ router.put("/:id", async (req, res) => {
     }
 
     const privileged = isPrivileged(user);
-    const { employee } = await Employees.getEmployeeByUserId(user!.userId);
+    const employee = await resolveEmployeeForUser(user!);
     const isSelf = employee?.id === existing.employee_id;
 
     if (!privileged && !isSelf) {
@@ -493,7 +528,7 @@ router.post("/:id/cancel", async (req, res) => {
     }
 
     const privileged = isPrivileged(user);
-    const { employee } = await Employees.getEmployeeByUserId(user!.userId);
+    const employee = await resolveEmployeeForUser(user!);
     const isSelf = employee?.id === existing.employee_id;
 
     if (!privileged && !isSelf) {

@@ -1,6 +1,9 @@
 import express from "express";
 const router = express.Router();
-import { Employees, LeaveBalances } from "../database/utils/database.js";
+import {
+  LeaveBalances,
+  resolveEmployeeForUser,
+} from "../database/utils/database.js";
 import {
   createLeaveBalanceSchema,
   leaveBalanceQuerySchema,
@@ -36,9 +39,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
     let effectiveEmployeeId = value.employeeId;
 
     if (!isPrivileged(req.user)) {
-      const { employee } = await Employees.getEmployeeByUserId(
-        req.user!.userId,
-      );
+      const employee = await resolveEmployeeForUser(req.user!);
 
       if (!employee) {
         return res.status(200).json({
@@ -99,7 +100,7 @@ router.get("/:id", async (req, res) => {
       });
     }
 
-    const { employee } = await Employees.getEmployeeByUserId(user!.userId);
+    const employee = await resolveEmployeeForUser(user!);
     const isSelf = employee?.id === leaveBalance.employee_id;
 
     if (!isPrivileged(user) && !isSelf) {
