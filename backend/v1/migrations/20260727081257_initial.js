@@ -157,7 +157,7 @@ export async function up(knex) {
       t.text("profile_picture");
       t.integer("national_id", 8);
 
-      t.boolean("is_active").notNullable().defaultTo(false);
+      t.boolean("is_active").notNullable().defaultTo(true);
 
       t.boolean("deleted").notNullable().defaultTo(false);
 

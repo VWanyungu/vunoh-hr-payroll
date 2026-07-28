@@ -77,6 +77,11 @@ export default function authorize() {
       },
       {
         method: "POST",
+        pattern: /^\/v1\/employees\/[^/]+\/activate$/,
+        roles: ["super_admin", "hr_admin"],
+      },
+      {
+        method: "POST",
         pattern: /^\/v1\/leave-requests\/[^/]+\/approve$/,
         roles: ["super_admin", "hr_admin", "manager"],
       },

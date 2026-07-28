@@ -33,8 +33,6 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-const cloudinaryDomain = process.env.CLOUDINARY_DOMAIN || 'res.cloudinary.com';
-
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 app.use(helmet({
@@ -43,11 +41,11 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", `https://${cloudinaryDomain}`],
+      imgSrc: ["'self'", "data:"],
       connectSrc: ["'self'", frontendUrl],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
-      mediaSrc: ["'self'", `https://${cloudinaryDomain}`],
+      mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
     },
   },

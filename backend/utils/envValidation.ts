@@ -16,8 +16,8 @@ const envVars: EnvVarConfig[] = [
   { name: "DB_NAME", required: true, description: "Database name" },
 
   // Redis
-  { name: "REDIS_URL", required: true, description: "Redis URL" },
-  { name: "REDIS_TOKEN", required: true, description: "Redis token" },
+  // { name: "REDIS_URL", required: true, description: "Redis URL" },
+  // { name: "REDIS_TOKEN", required: true, description: "Redis token" },
 
   // JWT Secrets
   {
@@ -52,13 +52,13 @@ const envVars: EnvVarConfig[] = [
   { name: "BACKEND_URL", required: true, description: "Backend URL" },
 
   // Email (SendGrid)
-  { name: "SENDGRID_USER", required: true, description: "SendGrid user" },
-  {
-    name: "SENDGRID_PASSWORD",
-    required: true,
-    description: "SendGrid password",
-  },
-  { name: "MAIL_FROM", required: true, description: "From email address" },
+  // { name: "SENDGRID_USER", required: true, description: "SendGrid user" },
+  // {
+  //   name: "SENDGRID_PASSWORD",
+  //   required: true,
+  //   description: "SendGrid password",
+  // },
+  // { name: "MAIL_FROM", required: true, description: "From email address" },
 
   // Server
   { name: "PORT", required: true, description: "Server port" },
@@ -68,27 +68,11 @@ const envVars: EnvVarConfig[] = [
     description: "Node environment (development/production)",
   },
 
-  // M-Pesa
-  // { name: 'MPESA_ENV', required: true, description: 'M-Pesa environment' },
-  // { name: 'MPESA_CONSUMER_KEY', required: true, description: 'M-Pesa consumer key' },
-  // { name: 'MPESA_CONSUMER_SECRET', required: true, description: 'M-Pesa consumer secret' },
-  // { name: 'MPESA_SHORTCODE', required: true, description: 'M-Pesa shortcode' },
-  // { name: 'MPESA_PASSKEY', required: true, description: 'M-Pesa passkey' },
-  // { name: 'MPESA_CALLBACK_URL', required: true, description: 'M-Pesa callback URL' },
-  // { name: 'MPESA_TRANSACTION_TYPE', required: true, description: 'M-Pesa transaction type' },
-
   // CORS
   {
     name: "CORS_ALLOWED_ORIGINS",
     required: false,
     description: "Comma-separated list of allowed CORS origins",
-  },
-
-  // Security
-  {
-    name: "CLOUDINARY_DOMAIN",
-    required: false,
-    description: "Cloudinary domain",
   },
 ];
 

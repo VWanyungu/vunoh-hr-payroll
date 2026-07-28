@@ -66,10 +66,6 @@ async function checkExternalServices(): Promise<ServiceHealth> {
   );
   checks.push(Promise.resolve(sendgridConfigured));
 
-  // Check Cloudinary configuration
-  const cloudinaryConfigured = !!process.env.CLOUDINARY_DOMAIN;
-  checks.push(Promise.resolve(cloudinaryConfigured));
-
   try {
     const results = await Promise.all(checks);
     const allConfigured = results.every(result => result === true);
