@@ -24,7 +24,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
 
   const userRoles: string[] = [];
 
-  user?.role?.map((r) => {
+  user?.role?.forEach((r) => {
     if (r.role === "super_admin" || r.role === "hr_admin") {
       userRoles.push(r.role);
     }

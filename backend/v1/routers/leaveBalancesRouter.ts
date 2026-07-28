@@ -8,6 +8,7 @@ import {
   createLeaveBalanceSchema,
   leaveBalanceQuerySchema,
 } from "../utils/validation.js";
+import { buildPagination } from "../utils/pagination.js";
 import type { AuthenticatedRequest, AuthUser } from "../types.js";
 
 function isPrivileged(user: AuthUser | undefined) {
@@ -47,15 +48,11 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
           data: {
             response: {
               leaveBalances: [],
-              pagination:
-                value.page !== undefined || value.limit !== undefined
-                  ? {
-                      page: value.page ?? 1,
-                      limit: value.limit ?? 10,
-                      total: 0,
-                      pages: 0,
-                    }
-                  : null,
+              pagination: buildPagination({
+                page: value.page,
+                limit: value.limit,
+                total: 0,
+              }),
             },
           },
           message: "Leave balances retrieved successfully",

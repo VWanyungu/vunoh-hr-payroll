@@ -9,6 +9,7 @@ import {
 } from "../database/utils/database.js";
 import { submitLeaveRequest } from "../utils/leave/submitLeaveRequest.js";
 import { countWorkingDays } from "../utils/leave/workingDays.js";
+import { buildPagination } from "../utils/pagination.js";
 import {
   createLeaveRequestSchema,
   updateLeaveRequestSchema,
@@ -77,15 +78,11 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
           data: {
             response: {
               leaveRequests: [],
-              pagination:
-                value.page !== undefined || value.limit !== undefined
-                  ? {
-                      page: value.page ?? 1,
-                      limit: value.limit ?? 10,
-                      total: 0,
-                      pages: 0,
-                    }
-                  : null,
+              pagination: buildPagination({
+                page: value.page,
+                limit: value.limit,
+                total: 0,
+              }),
             },
           },
           message: "Leave requests retrieved successfully",
