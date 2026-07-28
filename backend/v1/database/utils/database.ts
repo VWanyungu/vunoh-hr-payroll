@@ -16,6 +16,12 @@ import type {
   EmployeeFilters,
   AuthUser,
   LeaveTypeFilters,
+  CreateLeaveRequestInput,
+  LeaveRequestFilters,
+  LeaveRequestScope,
+  CreateLeaveBalanceInput,
+  UpdateLeaveBalanceInput,
+  LeaveBalanceFilters,
 } from "../../types.js";
 
 const EMPLOYEE_COLUMNS = [
@@ -401,6 +407,21 @@ export class LeaveTypes {
   }
 }
 
+export class PublicHolidays {
+  static async getHolidayDatesInRange(startDate: string, endDate: string) {
+    try {
+      const rows = await db("public_holidays")
+        .select("holiday_date")
+        .where("holiday_date", ">=", startDate)
+        .where("holiday_date", "<=", endDate);
+
+      return { holidayDates: rows.map((r) => r.holiday_date as string) };
+    } catch (error) {
+      return { holidayDates: [], error };
+    }
+  }
+}
+
 export class Roles {
   static async assignRole(roleObj: AssignRoleInput & { userId: string }) {
     try {
@@ -453,24 +474,45 @@ export class Employees {
     employeeObj: CreateEmployeeInput & { updatedBy: string },
   ) {
     try {
-      const [employee] = await db("employees")
-        .insert({
-          user_id: employeeObj.userId,
-          job_title: employeeObj.jobTitle,
-          team_id: employeeObj.teamId,
-          manager_id: employeeObj.managerId ?? null,
-          updated_by: employeeObj.updatedBy,
-          start_date: employeeObj.startDate,
-          salary: employeeObj.salary,
-          employment_type: employeeObj.employmentType,
-          resume: employeeObj.resume ?? null,
-          phone: employeeObj.phone ?? null,
-          profile_picture: employeeObj.profilePicture ?? null,
-          national_id: employeeObj.nationalId ?? null,
-        })
-        .returning(EMPLOYEE_COLUMNS);
+      return await db.transaction(async (trx) => {
+        const [employee] = await trx("employees")
+          .insert({
+            user_id: employeeObj.userId,
+            job_title: employeeObj.jobTitle,
+            team_id: employeeObj.teamId,
+            manager_id: employeeObj.managerId ?? null,
+            updated_by: employeeObj.updatedBy,
+            start_date: employeeObj.startDate,
+            salary: employeeObj.salary,
+            employment_type: employeeObj.employmentType,
+            resume: employeeObj.resume ?? null,
+            phone: employeeObj.phone ?? null,
+            profile_picture: employeeObj.profilePicture ?? null,
+            national_id: employeeObj.nationalId ?? null,
+          })
+          .returning(EMPLOYEE_COLUMNS);
 
-      return { employee };
+        const leaveTypes = await trx("leave_types").where(
+          "code",
+          "<>",
+          "unpaid",
+        );
+        const year = new Date(employeeObj.startDate).getFullYear();
+
+        for (const leaveType of leaveTypes) {
+          await LeaveBalances.createLeaveBalance(
+            {
+              employeeId: employee.id,
+              leaveTypeId: leaveType.id,
+              year,
+              allocated: leaveType.default_allowance_days ?? 0,
+            },
+            trx,
+          );
+        }
+
+        return { employee, error: null as unknown };
+      });
     } catch (error) {
       return { employee: null, error };
     }
@@ -550,6 +592,20 @@ export class Employees {
     }
   }
 
+  static async getEmployeeByUserId(userId: string) {
+    try {
+      const employee = await db("employees")
+        .select(EMPLOYEE_COLUMNS)
+        .where("user_id", userId)
+        .where("deleted", false)
+        .first();
+
+      return { employee: employee ?? null };
+    } catch (error) {
+      return { employee: null, error };
+    }
+  }
+
   static async updateEmployee(
     id: string,
     employeeObj: UpdateEmployeeInput & { updatedBy: string },
@@ -611,6 +667,418 @@ export class Employees {
       return { employee };
     } catch (error) {
       return { employee: null, error };
+    }
+  }
+}
+
+const LEAVE_REQUEST_COLUMNS = [
+  "id",
+  "employee_id",
+  "leave_type_id",
+  "start_date",
+  "end_date",
+  "working_days_count",
+  "status",
+  "cover_employee_id",
+  "approver_id",
+  "requested_at",
+  "decided_at",
+  "created_at",
+  "updated_at",
+];
+
+export class LeaveRequests {
+  static async getAllLeaveRequests({
+    page,
+    limit,
+    employeeId,
+    status,
+    scope,
+  }: PaginationInput & LeaveRequestFilters & { scope: LeaveRequestScope }) {
+    try {
+      const applyScope = (query: ReturnType<typeof db>) => {
+        if (scope.type === "own") {
+          query.where("employee_id", scope.employeeId);
+        } else if (scope.type === "managed") {
+          query.whereIn(
+            "employee_id",
+            db("employees")
+              .select("id")
+              .where((builder) => {
+                builder
+                  .where("manager_id", scope.managerEmployeeId)
+                  .orWhere("id", scope.managerEmployeeId);
+              }),
+          );
+        }
+      };
+
+      const leaveRequestsQuery = db("leave_requests").select(
+        LEAVE_REQUEST_COLUMNS,
+      );
+      applyScope(leaveRequestsQuery);
+      if (employeeId) leaveRequestsQuery.where("employee_id", employeeId);
+      if (status) leaveRequestsQuery.where("status", status);
+
+      if (page !== undefined || limit !== undefined) {
+        const resolvedPage = page ?? 1;
+        const resolvedLimit = limit ?? 10;
+        const offset = (resolvedPage - 1) * resolvedLimit;
+
+        const leaveRequests = await leaveRequestsQuery
+          .limit(resolvedLimit)
+          .offset(offset)
+          .orderBy("requested_at", "desc");
+
+        const totalQuery = db("leave_requests");
+        applyScope(totalQuery);
+        if (employeeId) totalQuery.where("employee_id", employeeId);
+        if (status) totalQuery.where("status", status);
+        const total = await totalQuery.count("* as total");
+
+        return {
+          leaveRequests,
+          pagination: {
+            page: resolvedPage,
+            limit: resolvedLimit,
+            total: total && total[0] && Number(total[0].total),
+            pages:
+              total &&
+              total[0] &&
+              Math.ceil(Number(total[0].total) / resolvedLimit),
+          },
+        };
+      }
+
+      const leaveRequests = await leaveRequestsQuery.orderBy(
+        "requested_at",
+        "desc",
+      );
+
+      return { leaveRequests, pagination: null };
+    } catch (error) {
+      return { leaveRequests: [], pagination: null, error };
+    }
+  }
+
+  static async getLeaveRequestById(id: string) {
+    try {
+      const leaveRequest = await db("leave_requests")
+        .select(LEAVE_REQUEST_COLUMNS)
+        .where("id", id)
+        .first();
+
+      return { leaveRequest: leaveRequest ?? null };
+    } catch (error) {
+      return { leaveRequest: null, error };
+    }
+  }
+
+  static async createLeaveRequest(
+    input: CreateLeaveRequestInput & {
+      employeeId: string;
+      workingDaysCount: number;
+    },
+  ) {
+    try {
+      const [leaveRequest] = await db("leave_requests")
+        .insert({
+          employee_id: input.employeeId,
+          leave_type_id: input.leaveTypeId,
+          start_date: input.startDate,
+          end_date: input.endDate,
+          working_days_count: input.workingDaysCount,
+          status: "pending",
+          cover_employee_id: input.coverEmployeeId ?? null,
+          requested_at: db.fn.now(),
+        })
+        .returning(LEAVE_REQUEST_COLUMNS);
+
+      return { leaveRequest };
+    } catch (error) {
+      return { leaveRequest: null, error };
+    }
+  }
+
+  static async updateLeaveRequest(
+    id: string,
+    updatePayload: Partial<{
+      leave_type_id: string;
+      start_date: string;
+      end_date: string;
+      working_days_count: number;
+      cover_employee_id: string | null;
+    }>,
+  ) {
+    try {
+      const [leaveRequest] = await db("leave_requests")
+        .where("id", id)
+        .where("status", "pending")
+        .update(updatePayload)
+        .returning(LEAVE_REQUEST_COLUMNS);
+
+      if (!leaveRequest) {
+        return {
+          leaveRequest: null,
+          error: "Leave request not found or not pending",
+        };
+      }
+
+      return { leaveRequest };
+    } catch (error) {
+      return { leaveRequest: null, error };
+    }
+  }
+
+  static async decideLeaveRequest(
+    id: string,
+    decision: { status: "approved" | "rejected"; approverId: string },
+  ) {
+    try {
+      const [leaveRequest] = await db("leave_requests")
+        .where("id", id)
+        .where("status", "pending")
+        .update({
+          status: decision.status,
+          approver_id: decision.approverId,
+          decided_at: db.fn.now(),
+        })
+        .returning(LEAVE_REQUEST_COLUMNS);
+
+      if (!leaveRequest) {
+        return {
+          leaveRequest: null,
+          error: "Leave request not found or not pending",
+        };
+      }
+
+      return { leaveRequest };
+    } catch (error) {
+      return { leaveRequest: null, error };
+    }
+  }
+
+  // Approving deducts the request's working_days_count from the matching
+  // leave_balances row (employee_id, leave_type_id, year of start_date) in the
+  // same transaction as the status change, so a request is never marked
+  // approved without its balance being reflected. "unpaid" leave types are not
+  // tracked in leave_balances and skip the deduction step entirely.
+  static async approveLeaveRequest(id: string, approverId: string) {
+    try {
+      return await db.transaction(async (trx) => {
+        const leaveRequest = await trx("leave_requests")
+          .where("id", id)
+          .forUpdate()
+          .first();
+
+        if (!leaveRequest) {
+          return { leaveRequest: null, error: "not_found" as const };
+        }
+
+        if (leaveRequest.status !== "pending") {
+          return { leaveRequest: null, error: "not_pending" as const };
+        }
+
+        const leaveType = await trx("leave_types")
+          .where("id", leaveRequest.leave_type_id)
+          .first();
+
+        if (leaveType && leaveType.code !== "unpaid") {
+          const year = new Date(leaveRequest.start_date).getFullYear();
+
+          const balance = await trx("leave_balances")
+            .where({
+              employee_id: leaveRequest.employee_id,
+              leave_type_id: leaveRequest.leave_type_id,
+              year,
+            })
+            .forUpdate()
+            .first();
+
+          if (!balance) {
+            return { leaveRequest: null, error: "no_balance" as const };
+          }
+
+          if (balance.remaining < leaveRequest.working_days_count) {
+            return {
+              leaveRequest: null,
+              error: "insufficient_balance" as const,
+            };
+          }
+
+          await LeaveBalances.updateLeaveBalance(
+            balance.id,
+            { used: balance.used + leaveRequest.working_days_count },
+            trx,
+          );
+        }
+
+        const [updated] = await trx("leave_requests")
+          .where("id", id)
+          .update({
+            status: "approved",
+            approver_id: approverId,
+            decided_at: trx.fn.now(),
+          })
+          .returning(LEAVE_REQUEST_COLUMNS);
+
+        return { leaveRequest: updated };
+      });
+    } catch (error) {
+      return { leaveRequest: null, error };
+    }
+  }
+
+  static async cancelLeaveRequest(id: string) {
+    try {
+      const [leaveRequest] = await db("leave_requests")
+        .where("id", id)
+        .where("status", "pending")
+        .update({ status: "cancelled", decided_at: db.fn.now() })
+        .returning(LEAVE_REQUEST_COLUMNS);
+
+      if (!leaveRequest) {
+        return {
+          leaveRequest: null,
+          error: "Leave request not found or not pending",
+        };
+      }
+
+      return { leaveRequest };
+    } catch (error) {
+      return { leaveRequest: null, error };
+    }
+  }
+}
+
+const LEAVE_BALANCE_COLUMNS = [
+  "id",
+  "employee_id",
+  "leave_type_id",
+  "year",
+  "allocated",
+  "used",
+  "remaining",
+  "created_at",
+  "updated_at",
+];
+
+export class LeaveBalances {
+  static async getAllLeaveBalances({
+    page,
+    limit,
+    employeeId,
+    leaveTypeId,
+    year,
+  }: PaginationInput & LeaveBalanceFilters) {
+    try {
+      const leaveBalancesQuery = db("leave_balances").select(
+        LEAVE_BALANCE_COLUMNS,
+      );
+      if (employeeId) leaveBalancesQuery.where("employee_id", employeeId);
+      if (leaveTypeId) leaveBalancesQuery.where("leave_type_id", leaveTypeId);
+      if (year) leaveBalancesQuery.where("year", year);
+
+      if (page !== undefined || limit !== undefined) {
+        const resolvedPage = page ?? 1;
+        const resolvedLimit = limit ?? 10;
+        const offset = (resolvedPage - 1) * resolvedLimit;
+
+        const leaveBalances = await leaveBalancesQuery
+          .limit(resolvedLimit)
+          .offset(offset)
+          .orderBy("year", "desc");
+
+        const totalQuery = db("leave_balances");
+        if (employeeId) totalQuery.where("employee_id", employeeId);
+        if (leaveTypeId) totalQuery.where("leave_type_id", leaveTypeId);
+        if (year) totalQuery.where("year", year);
+        const total = await totalQuery.count("* as total");
+
+        return {
+          leaveBalances,
+          pagination: {
+            page: resolvedPage,
+            limit: resolvedLimit,
+            total: total && total[0] && Number(total[0].total),
+            pages:
+              total &&
+              total[0] &&
+              Math.ceil(Number(total[0].total) / resolvedLimit),
+          },
+        };
+      }
+
+      const leaveBalances = await leaveBalancesQuery.orderBy("year", "desc");
+
+      return { leaveBalances, pagination: null };
+    } catch (error) {
+      return { leaveBalances: [], pagination: null, error };
+    }
+  }
+
+  static async getLeaveBalanceById(id: string) {
+    try {
+      const leaveBalance = await db("leave_balances")
+        .select(LEAVE_BALANCE_COLUMNS)
+        .where("id", id)
+        .first();
+
+      return { leaveBalance: leaveBalance ?? null };
+    } catch (error) {
+      return { leaveBalance: null, error };
+    }
+  }
+
+  static async createLeaveBalance(
+    input: CreateLeaveBalanceInput,
+    trx: typeof db = db,
+  ) {
+    try {
+      const [leaveBalance] = await trx("leave_balances")
+        .insert({
+          employee_id: input.employeeId,
+          leave_type_id: input.leaveTypeId,
+          year: input.year,
+          allocated: input.allocated,
+          used: 0,
+          remaining: input.allocated,
+        })
+        .returning(LEAVE_BALANCE_COLUMNS);
+
+      return { leaveBalance };
+    } catch (error) {
+      return { leaveBalance: null, error };
+    }
+  }
+
+  static async updateLeaveBalance(
+    id: string,
+    input: UpdateLeaveBalanceInput,
+    trx: typeof db = db,
+  ) {
+    try {
+      const existing = await trx("leave_balances").where("id", id).first();
+
+      if (!existing) {
+        return { leaveBalance: null, error: "Leave balance not found" };
+      }
+
+      const allocated = input.allocated ?? existing.allocated;
+      const used = input.used ?? existing.used;
+
+      const [leaveBalance] = await trx("leave_balances")
+        .where("id", id)
+        .update({
+          allocated,
+          used,
+          remaining: allocated - used,
+        })
+        .returning(LEAVE_BALANCE_COLUMNS);
+
+      return { leaveBalance };
+    } catch (error) {
+      return { leaveBalance: null, error };
     }
   }
 }
