@@ -126,3 +126,53 @@ export type EmployeeFilters = {
   isActive?: boolean | undefined;
   search?: string | undefined;
 };
+
+export type LeaveRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export type CreateLeaveRequestInput = {
+  employeeId?: string;
+  leaveTypeId: string;
+  startDate: string;
+  endDate: string;
+  coverEmployeeId?: string;
+};
+
+export type UpdateLeaveRequestInput = {
+  leaveTypeId?: string;
+  startDate?: string;
+  endDate?: string;
+  coverEmployeeId?: string;
+};
+
+export type LeaveRequestFilters = {
+  employeeId?: string | undefined;
+  status?: LeaveRequestStatus | undefined;
+};
+
+export type LeaveRequestScope =
+  | { type: "all" }
+  | { type: "own"; employeeId: string }
+  | { type: "managed"; managerEmployeeId: string };
+
+export type DecideLeaveRequestInput = {
+  status: "approved" | "rejected";
+  approverId: string;
+};
+
+export type CreateLeaveBalanceInput = {
+  employeeId: string;
+  leaveTypeId: string;
+  year: number;
+  allocated: number;
+};
+
+export type UpdateLeaveBalanceInput = {
+  allocated?: number;
+  used?: number;
+};
+
+export type LeaveBalanceFilters = {
+  employeeId?: string | undefined;
+  leaveTypeId?: string | undefined;
+  year?: number | undefined;
+};
