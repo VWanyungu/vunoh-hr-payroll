@@ -154,12 +154,10 @@
           return;
         }
 
-        // employees don't carry a `name` today (it lives on `users`, never
-        // joined here) — fall back to job title + a short user id.
         const table = renderTable(
           ["Name", "Job Title"],
           roster.map((e) => [
-            escapeHtml(e.name || `User ${String(e.user_id).slice(0, 8)}`),
+            escapeHtml(e.name),
             escapeHtml(e.job_title),
           ]),
         );

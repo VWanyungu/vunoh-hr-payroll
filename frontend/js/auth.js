@@ -49,6 +49,19 @@ function getUserId() {
   }
 }
 
+/** Decodes the `employeeId` claim from the access token, or null if absent/invalid. */
+function getEmployeeId() {
+  const token = getAccessToken();
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.employeeId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function requireAuth() {
   if (!getAccessToken()) {
     window.location.href = "html/public/login.html";

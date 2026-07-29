@@ -101,11 +101,6 @@
         }
 
         try {
-          // NOTE: same caveat as users.html — GET /v1/users type:"single"
-          // currently only supports lookup by inputEmail (via req.body, which
-          // can't be sent on a GET at all). This call assumes the pending fix
-          // adds id-based lookup via a query param, consistent with every
-          // other GET /:id-style endpoint in this API.
           const [userRes, employeesRes] = await Promise.all([
             apiGet(`/users?type=single&id=${userId}`),
             apiGet("/employees"),

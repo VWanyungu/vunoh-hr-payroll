@@ -66,12 +66,6 @@
 
       const listEl = document.getElementById("users-list");
 
-      // NOTE: GET /v1/users currently dispatches on req.body.type/status,
-      // which browser fetch cannot send on a GET request (the Fetch spec
-      // forbids a body on GET/HEAD, and browsers throw before sending it).
-      // This call assumes the pending backend fix moves `type`/`status` to
-      // query params, matching every other GET endpoint in this API. Until
-      // that lands, this request will 400.
       async function loadUsers(status) {
         listEl.innerHTML = "<p>Loading…</p>";
         try {
