@@ -1,0 +1,65 @@
+/**
+ * Auth helpers: token storage + JWT role decoding.
+ *
+ * Access token payload shape (see backend/v1/utils/generateJwtToken.ts +
+ * backend/v1/types.ts AuthUser): { userId, email, role: { id, role, team_id }[] }
+ */
+
+const ACCESS_TOKEN_KEY = "vunoh_access_token";
+const REFRESH_TOKEN_KEY = "vunoh_refresh_token";
+
+function getAccessToken() {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+function getRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function setTokens(access, refresh) {
+  if (access) localStorage.setItem(ACCESS_TOKEN_KEY, access);
+  if (refresh) localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+}
+
+function clearTokens() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+/**
+ * Decodes the access token payload client-side (no signature verification —
+ * the server is the source of truth for authorization, this is UI-only).
+ * Returns the array of assigned role entries `{ id, role, team_id }`, or [].
+ */
+function decodeRoles() {
+  const token = getAccessToken();
+  if (!token) return [];
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return Array.isArray(payload.role) ? payload.role : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Convenience: just the role name strings, e.g. ["hr_admin", "manager"]. */
+function getRoleNames() {
+  return decodeRoles().map((r) => r.role);
+}
+
+function requireAuth() {
+  if (!getAccessToken()) {
+    window.location.href = "/html/public/login.html";
+  }
+}
+
+/** Redirects to the dashboard if the current user holds none of `allowedRoles`. */
+function requireRole(allowedRoles) {
+  requireAuth();
+  const roleNames = getRoleNames();
+  const hasAccess = allowedRoles.some((role) => roleNames.includes(role));
+  if (!hasAccess) {
+    window.location.href = "/html/app/dashboard.html";
+  }
+}

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Component Test Page</title>
+    <link rel="stylesheet" href="./css/tokens.css" />
+    <link rel="stylesheet" href="./css/base.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+    <style>
+      /* Test-page-only layout scaffolding — throwaway, not a reusable component. */
+      body {
+        padding: var(--space-8);
+      }
+      section {
+        margin-bottom: var(--space-10);
+      }
+      .swatch-row {
+        display: flex;
+        gap: var(--space-3);
+        flex-wrap: wrap;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Component Test Page</h1>
+    <p>
+      Throwaway visual check for tokens.css wiring — delete before shipping.
+    </p>
+
+    <section>
+      <h2>Buttons</h2>
+      <div class="swatch-row">
+        <button class="btn btn-primary">Primary</button>
+        <button class="btn btn-secondary">Secondary</button>
+        <button class="btn btn-ghost">Ghost</button>
+        <button class="btn btn-danger">Danger</button>
+        <button class="btn btn-primary" disabled>Disabled</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Input field</h2>
+      <div class="input-group" style="max-width: 320px">
+        <label class="input-label" for="sample-input">Email address</label>
+        <input
+          class="input-field"
+          id="sample-input"
+          type="email"
+          placeholder="you@example.com"
+        />
+      </div>
+    </section>
+
+    <section>
+      <h2>Badges</h2>
+      <div class="swatch-row">
+        <span class="badge badge-pending">Pending</span>
+        <span class="badge badge-approved">Approved</span>
+        <span class="badge badge-rejected">Rejected</span>
+        <span class="badge badge-neutral">Neutral</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>Card</h2>
+      <div class="card" style="max-width: 360px">
+        <h3 class="card-title">Leave Balance</h3>
+        <p>Annual — 14 of 21 days remaining.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Table</h2>
+      <div id="table-slot" style="max-width: 640px">
+        <table class="table">
+          <!-- Table Header Section -->
+          <thead class="table-head">
+            <tr class="table-row">
+              <th>ID</th>
+              <th>Name</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+
+          <!-- Table Body / Rows Section -->
+          <tbody>
+            <tr class="table-row">
+              <td>1</td>
+              <td>Alice Smith</td>
+              <td>Developer</td>
+            </tr>
+            <tr class="table-row">
+              <td>2</td>
+              <td>Bob Jones</td>
+              <td>Designer</td>
+            </tr>
+            <tr class="table-row">
+              <td>3</td>
+              <td>Charlie Brown</td>
+              <td>Manager</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Sidebar + Topbar</h2>
+      <div
+        style="
+          display: flex;
+          border: var(--border-width) solid var(--color-border);
+        "
+      >
+        <div id="sidebar-slot"></div>
+        <div style="flex: 1">
+          <div id="topbar-slot"></div>
+        </div>
+      </div>
+    </section>
+
+    <script src="/js/components.js"></script>
+    <script>
+      document.getElementById("table-slot").innerHTML = renderTable(
+        ["Employee", "Team", "Status"],
+        [
+          ["Jane Doe", "Engineering", renderBadge("approved")],
+          ["John Smith", "Design", renderBadge("pending")],
+        ],
+      );
+
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(
+        ["hr_admin"],
+        "all-employees",
+      );
+
+      document.getElementById("topbar-slot").innerHTML = renderTopbar(
+        "All Employees",
+        {
+          label: "Create Employee",
+          variant: "primary",
+        },
+      );
+    </script>
+  </body>
+</html>
