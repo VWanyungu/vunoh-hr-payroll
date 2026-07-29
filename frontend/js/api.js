@@ -1,5 +1,5 @@
 // const API_BASE_URL = "http://localhost:3000/v1";
-const API_BASE_URL = "http://localhost:3000/v1";
+const API_BASE_URL = "https://vunoh-hr-payroll.vercel.app/v1";
 
 async function apiRequest(method, path, body) {
   const token = getAccessToken();
