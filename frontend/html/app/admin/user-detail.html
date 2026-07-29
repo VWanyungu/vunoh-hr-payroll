@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Detail — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .detail-field {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-4);
+        padding: var(--space-3) 0;
+        border-bottom: var(--border-width) solid var(--color-border);
+      }
+      .detail-field-label {
+        font-size: var(--text-sm);
+        color: var(--color-grey-700);
+      }
+      .role-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-2) 0;
+      }
+      .section-title {
+        font-size: var(--text-md);
+        font-weight: var(--weight-semibold);
+        color: var(--color-primary-900);
+        margin: var(--space-6) 0 var(--space-3);
+      }
+      .info-banner {
+        margin-top: var(--space-4);
+        padding: var(--space-3);
+        border-radius: var(--radius-sm);
+        background-color: var(--color-primary-100);
+        font-size: var(--text-sm);
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 620px;" id="detail-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const viewerRoles = getRoleNames();
+      const isSuperAdmin = viewerRoles.includes("super_admin");
+
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(viewerRoles, "user-accounts");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("User Detail");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("detail-panel");
+      const userId = new URLSearchParams(window.location.search).get("id");
+
+      function fieldRow(label, value) {
+        return `
+          <div class="detail-field">
+            <span class="detail-field-label">${escapeHtml(label)}</span>
+            <span>${value}</span>
+          </div>
+        `;
+      }
+
+      async function loadUser() {
+        if (!userId) {
+          panel.innerHTML = `<h2 class="card-title">User Detail</h2><p>Missing user id.</p>`;
+          return;
+        }
+
+        try {
+          // NOTE: same caveat as users.html — GET /v1/users type:"single"
+          // currently only supports lookup by inputEmail (via req.body, which
+          // can't be sent on a GET at all). This call assumes the pending fix
+          // adds id-based lookup via a query param, consistent with every
+          // other GET /:id-style endpoint in this API.
+          const [userRes, employeesRes] = await Promise.all([
+            apiGet(`/users?type=single&id=${userId}`),
+            apiGet("/employees"),
+          ]);
+
+          const user = userRes?.data?.response?.user || userRes?.data;
+
+          if (!user || !user.id) {
+            panel.innerHTML = `<h2 class="card-title">User Detail</h2><p>User not found.</p>`;
+            return;
+          }
+
+          const employees = employeesRes?.data?.response?.employees || [];
+          const hasEmployeeRecord = employees.some((e) => e.user_id === user.id);
+
+          renderUser(user, hasEmployeeRecord);
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">User Detail</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load this user.")}</p>
+          `;
+        }
+      }
+
+      function renderUser(user, hasEmployeeRecord) {
+        const roleRows = (user.roles || [])
+          .map(
+            (r) => `
+              <div class="role-row">
+                <span>${escapeHtml(r.role)}${r.team_id ? ` (team: ${escapeHtml(r.team_id)})` : ""}</span>
+                <button class="btn btn-ghost revoke-role-btn" data-role-id="${r.id}">Revoke</button>
+              </div>
+            `,
+          )
+          .join("") || "<p>No roles assigned.</p>";
+
+        const createEmployeePrompt = user.status === "approved" && !hasEmployeeRecord
+          ? `
+            <div class="info-banner">
+              This user is approved but has no employee record yet.
+              <a href="/html/app/admin/create-employee.html?userId=${user.id}">Create Employee Record</a>
+            </div>
+          `
+          : "";
+
+        panel.innerHTML = `
+          <h2 class="card-title">User Detail</h2>
+          ${fieldRow("Name", escapeHtml(user.name))}
+          ${fieldRow("Email", escapeHtml(user.email))}
+          ${fieldRow("Status", renderBadge(user.status))}
+          ${createEmployeePrompt}
+
+          <div class="section-title">Status</div>
+          <div style="display: flex; gap: var(--space-3);">
+            <button class="btn btn-primary" id="approve-btn" ${user.status === "approved" ? "disabled" : ""}>Approve</button>
+            <button class="btn btn-danger" id="reject-btn" ${user.status === "rejected" ? "disabled" : ""}>Reject</button>
+          </div>
+          <p id="status-error" class="input-error-message" style="display: none; margin-top: var(--space-3);"></p>
+
+          <div class="section-title">Roles</div>
+          <div id="roles-list">${roleRows}</div>
+          <p id="role-error" class="input-error-message" style="display: none; margin-top: var(--space-3);"></p>
+
+          <form id="assign-role-form" style="display: flex; gap: var(--space-3); align-items: flex-end; margin-top: var(--space-4);">
+            <div class="input-group">
+              <label class="input-label" for="role-select">Assign role</label>
+              <select class="input-field" id="role-select">
+                <option value="employee">employee</option>
+                <option value="manager">manager</option>
+                <option value="hr_admin">hr_admin</option>
+                <option value="super_admin">super_admin</option>
+              </select>
+            </div>
+            <div class="input-group" id="team-group" hidden>
+              <label class="input-label" for="team-select">Team</label>
+              <select class="input-field" id="team-select"></select>
+            </div>
+            <button class="btn btn-secondary" type="submit">Add role</button>
+          </form>
+
+          <div class="section-title">Account access</div>
+          <div style="display: flex; gap: var(--space-3); align-items: center;">
+            <button class="btn btn-secondary" disabled>Activate / Deactivate</button>
+            <small>Coming soon</small>
+          </div>
+
+          ${isSuperAdmin ? `
+            <div class="section-title">Danger zone</div>
+            <div style="display: flex; gap: var(--space-3); align-items: center;">
+              <button class="btn btn-danger" disabled>Delete user (soft-delete)</button>
+              <small>Coming soon — current DELETE /v1/users endpoint is a non-functional stub</small>
+            </div>
+          ` : ""}
+        `;
+
+        wireActions(user);
+      }
+
+      function wireActions(user) {
+        const approveBtn = document.getElementById("approve-btn");
+        const rejectBtn = document.getElementById("reject-btn");
+        const statusError = document.getElementById("status-error");
+
+        async function setStatus(status) {
+          statusError.style.display = "none";
+          approveBtn.disabled = true;
+          rejectBtn.disabled = true;
+
+          try {
+            await apiPut(`/users/${user.id}`, { status });
+            loadUser();
+          } catch (err) {
+            statusError.textContent = err.message || "Failed to update status.";
+            statusError.style.display = "block";
+            approveBtn.disabled = user.status === "approved";
+            rejectBtn.disabled = user.status === "rejected";
+          }
+        }
+
+        approveBtn.addEventListener("click", () => setStatus("approved"));
+        rejectBtn.addEventListener("click", () => setStatus("rejected"));
+
+        const roleError = document.getElementById("role-error");
+        document.querySelectorAll(".revoke-role-btn").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            roleError.style.display = "none";
+            btn.disabled = true;
+
+            try {
+              await apiPost(`/users/${user.id}/role/${btn.dataset.roleId}`, undefined);
+              loadUser();
+            } catch (err) {
+              roleError.textContent = err.message || "Failed to revoke role.";
+              roleError.style.display = "block";
+              btn.disabled = false;
+            }
+          });
+        });
+
+        const roleSelect = document.getElementById("role-select");
+        const teamGroup = document.getElementById("team-group");
+        const teamSelect = document.getElementById("team-select");
+
+        // Per §5: a teamId is only meaningful for the "manager" role.
+        roleSelect.addEventListener("change", async () => {
+          if (roleSelect.value !== "manager") {
+            teamGroup.hidden = true;
+            return;
+          }
+
+          teamGroup.hidden = false;
+          if (!teamSelect.dataset.loaded) {
+            teamSelect.innerHTML = `<option>Loading…</option>`;
+            try {
+              const res = await apiGet("/teams");
+              const teams = res?.data?.response?.teams || [];
+              teamSelect.innerHTML = teams.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+              teamSelect.dataset.loaded = "true";
+            } catch {
+              teamSelect.innerHTML = `<option value="">Failed to load teams</option>`;
+            }
+          }
+        });
+
+        document.getElementById("assign-role-form").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          roleError.style.display = "none";
+
+          const payload = { role: roleSelect.value };
+          if (roleSelect.value === "manager") {
+            if (!teamSelect.value) {
+              roleError.textContent = "Select a team for the manager role.";
+              roleError.style.display = "block";
+              return;
+            }
+            payload.teamId = teamSelect.value;
+          }
+
+          try {
+            await apiPost(`/users/${user.id}/role`, payload);
+            loadUser();
+          } catch (err) {
+            roleError.textContent = err.message || "Failed to assign role.";
+            roleError.style.display = "block";
+          }
+        });
+      }
+
+      loadUser();
+    </script>
+  </body>
+</html>
