@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leave Request Detail — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .detail-field {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-4);
+        padding: var(--space-3) 0;
+        border-bottom: var(--border-width) solid var(--color-border);
+      }
+      .detail-field:last-child {
+        border-bottom: none;
+      }
+      .detail-field-label {
+        font-size: var(--text-sm);
+        color: var(--color-grey-700);
+      }
+      .detail-field-value {
+        font-size: var(--text-base);
+        text-align: right;
+      }
+      .coverage-box {
+        margin-top: var(--space-4);
+        padding: var(--space-3);
+        border-radius: var(--radius-sm);
+        background-color: var(--color-primary-100);
+        font-size: var(--text-sm);
+      }
+      .coverage-warning {
+        margin-top: var(--space-2);
+        padding: var(--space-3);
+        border-radius: var(--radius-sm);
+        background-color: var(--color-warning-bg);
+        color: var(--color-warning);
+        font-size: var(--text-sm);
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 560px;" id="detail-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireAuth();
+
+      const roles = getRoleNames();
+      const userId = getUserId();
+      const isPrivileged = roles.includes("hr_admin") || roles.includes("super_admin");
+      const isManager = roles.includes("manager");
+      // Only manager/hr_admin/super_admin can call GET /v1/employees (list),
+      // which is what "am I viewing my own request or someone else's" needs
+      // to be resolved from — see the isSelf resolution in loadDetail().
+      const canListEmployees = isManager || isPrivileged;
+
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-leave-requests");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Leave Request Detail");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("detail-panel");
+      const requestId = new URLSearchParams(window.location.search).get("id");
+
+      function fieldRow(label, value) {
+        return `
+          <div class="detail-field">
+            <span class="detail-field-label">${escapeHtml(label)}</span>
+            <span class="detail-field-value">${value}</span>
+          </div>
+        `;
+      }
+
+      async function loadDetail() {
+        if (!requestId) {
+          panel.innerHTML = `<h2 class="card-title">Leave Request Detail</h2><p>Missing request id.</p>`;
+          return;
+        }
+
+        try {
+          const [detailRes, typesRes] = await Promise.all([
+            apiGet(`/leave-requests/${requestId}`),
+            apiGet("/leave-types"),
+          ]);
+
+          const leaveRequest = detailRes?.data?.response?.leaveRequest;
+          const teamCoverage = detailRes?.data?.response?.teamCoverage;
+          const leaveTypes = typesRes?.data?.response?.leaveTypes || [];
+
+          if (!leaveRequest) {
+            panel.innerHTML = `<h2 class="card-title">Leave Request Detail</h2><p>Leave request not found.</p>`;
+            return;
+          }
+
+          // A plain employee can only ever fetch their own request here (the
+          // server enforces isSelf/managing/privileged on GET /:id), so for
+          // that role isSelf is guaranteed true without any extra lookup.
+          // manager/hr_admin/super_admin can view others' requests too, so we
+          // resolve their own employeeId (via the list endpoint they're
+          // authorized for) to tell "my own pending request" (Edit/Cancel)
+          // apart from "someone else's, awaiting my decision" (Approve/Reject).
+          let isSelf = !canListEmployees;
+
+          if (canListEmployees) {
+            const allRes = await apiGet("/employees");
+            const all = allRes?.data?.response?.employees || [];
+            const self = all.find((e) => e.user_id === userId);
+            isSelf = self ? self.id === leaveRequest.employee_id : false;
+          }
+
+          renderDetail(leaveRequest, leaveTypes, teamCoverage, isSelf);
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">Leave Request Detail</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load this leave request.")}</p>
+          `;
+        }
+      }
+
+      function renderDetail(leaveRequest, leaveTypes, teamCoverage, isSelf) {
+        const typeName = leaveTypes.find((t) => t.id === leaveRequest.leave_type_id)?.name
+          || leaveRequest.leave_type_id;
+
+        // §5 lifecycle rule: action buttons are hidden entirely once a request
+        // has been decided or cancelled, not merely disabled. Which set of
+        // actions shows (Edit/Cancel vs Approve/Reject) depends on whether
+        // this is the viewer's own request or one awaiting their decision.
+        let actions = "";
+        if (leaveRequest.status === "pending") {
+          actions = isSelf
+            ? `
+              <div style="display: flex; gap: var(--space-3); margin-top: var(--space-5);">
+                <button class="btn btn-secondary" id="edit-btn">Edit</button>
+                <button class="btn btn-danger" id="cancel-btn">Cancel request</button>
+              </div>
+            `
+            : `
+              <div style="display: flex; gap: var(--space-3); margin-top: var(--space-5);">
+                <button class="btn btn-primary" id="approve-btn">Approve</button>
+                <button class="btn btn-danger" id="reject-btn">Reject</button>
+              </div>
+            `;
+        }
+
+        const coverageBox = teamCoverage
+          ? `
+            <div class="coverage-box">
+              Team coverage: ${escapeHtml(teamCoverage.employeesOnLeave)}/${escapeHtml(teamCoverage.teamSize)} on leave
+              (${escapeHtml(teamCoverage.capacityPercentage)}% capacity if approved)
+            </div>
+            ${teamCoverage.warning ? `<div class="coverage-warning">${escapeHtml(teamCoverage.warning)}</div>` : ""}
+          `
+          : "";
+
+        panel.innerHTML = `
+          <h2 class="card-title">Leave Request Detail</h2>
+          ${fieldRow("Leave type", escapeHtml(typeName))}
+          ${fieldRow("Dates", `${escapeHtml(leaveRequest.start_date)} – ${escapeHtml(leaveRequest.end_date)}`)}
+          ${fieldRow("Working days", escapeHtml(leaveRequest.working_days_count))}
+          ${fieldRow("Status", renderBadge(leaveRequest.status))}
+          ${fieldRow("Cover employee", leaveRequest.cover_employee_id ? escapeHtml(leaveRequest.cover_employee_id) : "—")}
+          ${fieldRow("Approver", leaveRequest.approver_id ? escapeHtml(leaveRequest.approver_id) : "—")}
+          ${fieldRow("Requested at", escapeHtml(leaveRequest.requested_at))}
+          ${fieldRow("Decided at", leaveRequest.decided_at ? escapeHtml(leaveRequest.decided_at) : "—")}
+          ${coverageBox}
+          <div id="action-error" class="input-error-message" style="display: none; margin-top: var(--space-4);"></div>
+          <div id="edit-form-slot"></div>
+          ${actions}
+        `;
+
+        const editBtn = document.getElementById("edit-btn");
+        const cancelBtn = document.getElementById("cancel-btn");
+        const approveBtn = document.getElementById("approve-btn");
+        const rejectBtn = document.getElementById("reject-btn");
+        const actionError = document.getElementById("action-error");
+
+        if (editBtn) {
+          editBtn.addEventListener("click", () => renderEditForm(leaveRequest, leaveTypes));
+        }
+
+        if (cancelBtn) {
+          cancelBtn.addEventListener("click", async () => {
+            if (!window.confirm("Cancel this leave request? This cannot be undone.")) return;
+
+            cancelBtn.disabled = true;
+            cancelBtn.textContent = "Cancelling…";
+            actionError.style.display = "none";
+
+            try {
+              await apiPost(`/leave-requests/${requestId}/cancel`, undefined);
+              loadDetail();
+            } catch (err) {
+              actionError.textContent = err.message || "Failed to cancel this request.";
+              actionError.style.display = "block";
+              cancelBtn.disabled = false;
+              cancelBtn.textContent = "Cancel request";
+            }
+          });
+        }
+
+        if (approveBtn) {
+          approveBtn.addEventListener("click", async () => {
+            approveBtn.disabled = true;
+            rejectBtn.disabled = true;
+            actionError.style.display = "none";
+
+            try {
+              await apiPost(`/leave-requests/${requestId}/approve`, undefined);
+              loadDetail();
+            } catch (err) {
+              actionError.textContent = err.message || "Failed to approve this request.";
+              actionError.style.display = "block";
+              approveBtn.disabled = false;
+              rejectBtn.disabled = false;
+            }
+          });
+        }
+
+        if (rejectBtn) {
+          rejectBtn.addEventListener("click", async () => {
+            if (!window.confirm("Reject this leave request?")) return;
+
+            approveBtn.disabled = true;
+            rejectBtn.disabled = true;
+            actionError.style.display = "none";
+
+            try {
+              await apiPost(`/leave-requests/${requestId}/reject`, undefined);
+              loadDetail();
+            } catch (err) {
+              actionError.textContent = err.message || "Failed to reject this request.";
+              actionError.style.display = "block";
+              approveBtn.disabled = false;
+              rejectBtn.disabled = false;
+            }
+          });
+        }
+      }
+
+      function renderEditForm(leaveRequest, leaveTypes) {
+        const slot = document.getElementById("edit-form-slot");
+
+        slot.innerHTML = `
+          <form id="edit-request-form" style="margin-top: var(--space-4); padding-top: var(--space-4); border-top: var(--border-width) solid var(--color-border);">
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="edit-leaveType">Leave type</label>
+              <select class="input-field" id="edit-leaveType">
+                ${leaveTypes
+                  .map((t) => `<option value="${t.id}" ${t.id === leaveRequest.leave_type_id ? "selected" : ""}>${escapeHtml(t.name || t.code)}</option>`)
+                  .join("")}
+              </select>
+            </div>
+            <div style="display: flex; gap: var(--space-4); margin-bottom: var(--space-4);">
+              <div class="input-group" style="flex: 1;">
+                <label class="input-label" for="edit-startDate">Start date</label>
+                <input class="input-field" id="edit-startDate" type="date" value="${escapeHtml(leaveRequest.start_date)}" />
+              </div>
+              <div class="input-group" style="flex: 1;">
+                <label class="input-label" for="edit-endDate">End date</label>
+                <input class="input-field" id="edit-endDate" type="date" value="${escapeHtml(leaveRequest.end_date)}" />
+              </div>
+            </div>
+            <p id="edit-error" class="input-error-message" style="display: none; margin-bottom: var(--space-4);"></p>
+            <div style="display: flex; gap: var(--space-3);">
+              <button class="btn btn-primary" type="submit">Save changes</button>
+              <button class="btn btn-secondary" type="button" id="cancel-edit-btn">Cancel</button>
+            </div>
+          </form>
+        `;
+
+        document.getElementById("cancel-edit-btn").addEventListener("click", () => {
+          slot.innerHTML = "";
+        });
+
+        document.getElementById("edit-request-form").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const errorEl = document.getElementById("edit-error");
+          errorEl.style.display = "none";
+
+          const payload = {
+            leaveTypeId: document.getElementById("edit-leaveType").value,
+            startDate: document.getElementById("edit-startDate").value,
+            endDate: document.getElementById("edit-endDate").value,
+          };
+
+          try {
+            await apiPut(`/leave-requests/${requestId}`, payload);
+            slot.innerHTML = "";
+            loadDetail();
+          } catch (err) {
+            errorEl.textContent = err.message || "Failed to update this leave request.";
+            errorEl.style.display = "block";
+          }
+        });
+      }
+
+      loadDetail();
+    </script>
+  </body>
+</html>

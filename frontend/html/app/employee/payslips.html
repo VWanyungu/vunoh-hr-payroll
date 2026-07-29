@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Payslips — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .period-filter {
+        display: flex;
+        gap: var(--space-3);
+        align-items: flex-end;
+        margin-bottom: var(--space-5);
+      }
+      .detail-field {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-4);
+        padding: var(--space-3) 0;
+        border-bottom: var(--border-width) solid var(--color-border);
+      }
+      .detail-field:last-child {
+        border-bottom: none;
+      }
+      .detail-field-label {
+        font-size: var(--text-sm);
+        color: var(--color-grey-700);
+      }
+      .detail-field-value {
+        font-size: var(--text-base);
+        text-align: right;
+      }
+      .payslips-layout {
+        display: grid;
+        grid-template-columns: minmax(420px, 1fr) 360px;
+        gap: var(--space-6);
+        align-items: start;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="payslips-layout">
+            <section class="card">
+              <div class="period-filter">
+                <div class="input-group">
+                  <label class="input-label" for="filter-month">Month</label>
+                  <select class="input-field" id="filter-month">
+                    <option value="">Any</option>
+                  </select>
+                </div>
+                <div class="input-group">
+                  <label class="input-label" for="filter-year">Year</label>
+                  <input class="input-field" id="filter-year" type="number" min="2000" max="2100" style="width: 110px;" />
+                </div>
+                <button class="btn btn-secondary" id="clear-filter-btn">Clear</button>
+              </div>
+              <div id="payslips-list"><p>Loading…</p></div>
+            </section>
+
+            <section class="card" id="payslip-detail-panel">
+              <h3 class="card-title">Payslip Detail</h3>
+              <p>Select a payslip to see the full breakdown.</p>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireAuth();
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-payslips");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("My Payslips");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const listEl = document.getElementById("payslips-list");
+      const detailPanel = document.getElementById("payslip-detail-panel");
+      const monthSelect = document.getElementById("filter-month");
+      const yearInput = document.getElementById("filter-year");
+
+      monthSelect.innerHTML =
+        `<option value="">Any</option>` +
+        Array.from({ length: 12 }, (_, i) => i + 1)
+          .map((m) => `<option value="${m}">${String(m).padStart(2, "0")}</option>`)
+          .join("");
+
+      async function loadPayslips() {
+        listEl.innerHTML = "<p>Loading…</p>";
+
+        const params = new URLSearchParams();
+        if (monthSelect.value) params.set("periodMonth", monthSelect.value);
+        if (yearInput.value) params.set("periodYear", yearInput.value);
+        const query = params.toString() ? `?${params.toString()}` : "";
+
+        try {
+          const res = await apiGet(`/payslips${query}`);
+          const rows = res?.data?.response?.payslips || [];
+
+          if (rows.length === 0) {
+            listEl.innerHTML = "<p>No payslips yet.</p>";
+            return;
+          }
+
+          const table = renderTable(
+            ["Period", "Gross", "Net", "Version"],
+            rows.map((p) => [
+              `${String(p.period_month).padStart(2, "0")}/${p.period_year}`,
+              escapeHtml(p.gross_pay),
+              escapeHtml(p.net_pay),
+              escapeHtml(p.version),
+            ]),
+          );
+
+          listEl.innerHTML = table;
+
+          listEl.querySelectorAll(".table-row").forEach((row, i) => {
+            row.addEventListener("click", () => loadDetail(rows[i].id));
+          });
+        } catch (err) {
+          listEl.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load payslips.")}</p>`;
+        }
+      }
+
+      function fieldRow(label, value) {
+        return `
+          <div class="detail-field">
+            <span class="detail-field-label">${escapeHtml(label)}</span>
+            <span class="detail-field-value">${escapeHtml(value)}</span>
+          </div>
+        `;
+      }
+
+      async function loadDetail(payslipId) {
+        detailPanel.innerHTML = `<h3 class="card-title">Payslip Detail</h3><p>Loading…</p>`;
+
+        try {
+          const res = await apiGet(`/payslips?payslipId=${payslipId}`);
+          const payslip = (res?.data?.response?.payslips || [])[0];
+
+          if (!payslip) {
+            detailPanel.innerHTML = `<h3 class="card-title">Payslip Detail</h3><p>Payslip not found.</p>`;
+            return;
+          }
+
+          detailPanel.innerHTML = `
+            <h3 class="card-title">Payslip Detail</h3>
+            ${fieldRow("Period", `${String(payslip.period_month).padStart(2, "0")}/${payslip.period_year}`)}
+            ${fieldRow("Gross pay", payslip.gross_pay)}
+            ${fieldRow("Unpaid leave days", payslip.unpaid_leave_days)}
+            ${fieldRow("NSSF", payslip.nssf)}
+            ${fieldRow("SHIF", payslip.shif)}
+            ${fieldRow("AHL", payslip.ahl)}
+            ${fieldRow("PAYE", payslip.paye)}
+            ${fieldRow("Net pay", payslip.net_pay)}
+            ${fieldRow("Version", payslip.version)}
+            ${fieldRow("Generated at", payslip.generated_at)}
+            <button class="btn btn-secondary" disabled style="margin-top: var(--space-5); width: 100%;">
+              Download PDF (Coming soon)
+            </button>
+          `;
+        } catch (err) {
+          detailPanel.innerHTML = `
+            <h3 class="card-title">Payslip Detail</h3>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load payslip detail.")}</p>
+          `;
+        }
+      }
+
+      monthSelect.addEventListener("change", loadPayslips);
+      yearInput.addEventListener("change", loadPayslips);
+      document.getElementById("clear-filter-btn").addEventListener("click", () => {
+        monthSelect.value = "";
+        yearInput.value = "";
+        loadPayslips();
+      });
+
+      loadPayslips();
+    </script>
+  </body>
+</html>

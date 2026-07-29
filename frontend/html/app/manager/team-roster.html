@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Team Roster — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" id="roster-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireRole(["manager"]);
+
+      const roles = getRoleNames();
+      const userId = getUserId();
+
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-team-roster");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("My Team Roster");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("roster-panel");
+
+      async function loadRoster() {
+        try {
+          // GET /v1/employees?manager=:managerId needs the manager's own
+          // employeeId (not userId) — resolved by listing all employees
+          // (manager role is authorized for that) and matching on user_id,
+          // same pattern used to resolve "my own employeeId" elsewhere.
+          const allRes = await apiGet("/employees");
+          const all = allRes?.data?.response?.employees || [];
+          const self = all.find((e) => e.user_id === userId);
+
+          if (!self) {
+            panel.innerHTML = `
+              <h2 class="card-title">My Team Roster</h2>
+              <p>No employee record found for your account yet.</p>
+            `;
+            return;
+          }
+
+          const reportsRes = await apiGet(`/employees?manager=${self.id}`);
+          const reports = reportsRes?.data?.response?.employees || [];
+
+          if (reports.length === 0) {
+            panel.innerHTML = `
+              <h2 class="card-title">My Team Roster</h2>
+              <p>No direct reports.</p>
+            `;
+            return;
+          }
+
+          const table = renderTable(
+            ["Name", "Job Title", "Employment Type", "Active"],
+            reports.map((e) => [
+              escapeHtml(e.name || `User ${String(e.user_id).slice(0, 8)}`),
+              escapeHtml(e.job_title),
+              escapeHtml(e.employment_type),
+              e.is_active ? "Yes" : "No",
+            ]),
+          );
+
+          panel.innerHTML = `
+            <h2 class="card-title">My Team Roster</h2>
+            ${table}
+          `;
+
+          panel.querySelectorAll(".table-row").forEach((row, i) => {
+            row.addEventListener("click", () => {
+              window.location.href = `/html/app/manager/team-member-profile.html?id=${reports[i].id}`;
+            });
+          });
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">My Team Roster</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load your team roster.")}</p>
+          `;
+        }
+      }
+
+      loadRoster();
+    </script>
+  </body>
+</html>

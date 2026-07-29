@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>New Leave Request — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .form-hint {
+        font-size: var(--text-xs);
+        color: var(--color-grey-700);
+      }
+      .form-warning {
+        font-size: var(--text-sm);
+        color: var(--color-warning);
+        background-color: var(--color-warning-bg);
+        padding: var(--space-3);
+        border-radius: var(--radius-sm);
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 560px;" id="form-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireAuth();
+
+      const roles = getRoleNames();
+      const canListEmployees = roles.some((r) => ["manager", "hr_admin", "super_admin"].includes(r));
+
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-leave-requests");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("New Leave Request");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("form-panel");
+      const todayIso = new Date().toISOString().slice(0, 10);
+
+      function estimateWorkingDays(startIso, endIso) {
+        const start = new Date(startIso);
+        const end = new Date(endIso);
+        if (isNaN(start) || isNaN(end) || end < start) return 0;
+
+        let count = 0;
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const day = d.getDay();
+          if (day !== 0 && day !== 6) count++;
+        }
+        return count;
+      }
+
+      let teamRoster = null; // lazily fetched only if a requiresCover type is selected
+
+      async function loadInitialData() {
+        try {
+          const [typesRes, balancesRes] = await Promise.all([
+            apiGet("/leave-types"),
+            apiGet(`/leave-balances?year=${new Date().getFullYear()}`),
+          ]);
+
+          const leaveTypes = typesRes?.data?.response?.leaveTypes || [];
+          const balances = balancesRes?.data?.response?.leaveBalances || [];
+
+          if (leaveTypes.length === 0) {
+            panel.innerHTML = `
+              <h2 class="card-title">New Leave Request</h2>
+              <p>No leave types are configured yet.</p>
+            `;
+            return;
+          }
+
+          renderForm(leaveTypes, balances);
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">New Leave Request</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load leave request form data.")}</p>
+          `;
+        }
+      }
+
+      function renderForm(leaveTypes, balances) {
+        panel.innerHTML = `
+          <h2 class="card-title">New Leave Request</h2>
+          <form id="request-form">
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="leaveType">Leave type</label>
+              <select class="input-field" id="leaveType" required>
+                <option value="" disabled selected>Select a leave type…</option>
+                ${leaveTypes
+                  .map((t) => `<option value="${t.id}">${escapeHtml(t.name || t.code)}</option>`)
+                  .join("")}
+              </select>
+              <p class="form-hint" id="type-rules"></p>
+            </div>
+
+            <div style="display: flex; gap: var(--space-4); margin-bottom: var(--space-4);">
+              <div class="input-group" style="flex: 1;">
+                <label class="input-label" for="startDate">Start date</label>
+                <input class="input-field" id="startDate" type="date" required />
+              </div>
+              <div class="input-group" style="flex: 1;">
+                <label class="input-label" for="endDate">End date</label>
+                <input class="input-field" id="endDate" type="date" required />
+              </div>
+            </div>
+
+            <p id="notice-warning" class="form-warning" style="display: none; margin-bottom: var(--space-4);"></p>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);" id="cover-group" hidden>
+              <label class="input-label" for="coverEmployee">Cover employee</label>
+              <select class="input-field" id="coverEmployee"></select>
+              <p class="form-hint" id="cover-hint"></p>
+            </div>
+
+            <p class="form-hint" id="balance-hint" style="margin-bottom: var(--space-4);"></p>
+            <p class="form-hint" id="days-estimate" style="margin-bottom: var(--space-4);"></p>
+
+            <p id="request-error" class="input-error-message" style="display: none; margin-bottom: var(--space-4);"></p>
+
+            <button class="btn btn-primary" type="submit" id="request-submit">Submit request</button>
+          </form>
+        `;
+
+        const form = document.getElementById("request-form");
+        const typeSelect = document.getElementById("leaveType");
+        const startInput = document.getElementById("startDate");
+        const endInput = document.getElementById("endDate");
+        const rulesEl = document.getElementById("type-rules");
+        const noticeWarningEl = document.getElementById("notice-warning");
+        const coverGroup = document.getElementById("cover-group");
+        const coverSelect = document.getElementById("coverEmployee");
+        const coverHint = document.getElementById("cover-hint");
+        const balanceHint = document.getElementById("balance-hint");
+        const daysEstimateEl = document.getElementById("days-estimate");
+        const errorEl = document.getElementById("request-error");
+        const submitBtn = document.getElementById("request-submit");
+
+        function selectedType() {
+          return leaveTypes.find((t) => t.id === typeSelect.value);
+        }
+
+        async function updateCoverField() {
+          const type = selectedType();
+          const requiresCover = !!type?.requires_cover;
+
+          coverGroup.hidden = !requiresCover;
+          if (!requiresCover) return;
+
+          if (!canListEmployees) {
+            coverSelect.innerHTML = "";
+            coverSelect.disabled = true;
+            coverHint.textContent =
+              "No endpoint is available yet for an employee to list their team roster — a manager or HR admin can submit this request with a cover employee on your behalf until that's added.";
+            submitBtn.disabled = true;
+            return;
+          }
+
+          coverSelect.disabled = false;
+          if (teamRoster === null) {
+            coverSelect.innerHTML = `<option value="">Loading roster…</option>`;
+            try {
+              const res = await apiGet("/employees");
+              teamRoster = res?.data?.response?.employees || [];
+            } catch {
+              teamRoster = [];
+            }
+          }
+
+          if (teamRoster.length === 0) {
+            coverSelect.innerHTML = `<option value="">No teammates available</option>`;
+            coverHint.textContent = "";
+            return;
+          }
+
+          coverSelect.innerHTML =
+            `<option value="" disabled selected>Select a cover employee…</option>` +
+            teamRoster.map((e) => `<option value="${e.id}">${escapeHtml(e.job_title)} (${String(e.user_id).slice(0, 8)})</option>`).join("");
+          coverHint.textContent = "";
+          submitBtn.disabled = false;
+        }
+
+        function updateRulesAndWarning() {
+          const type = selectedType();
+          if (!type) {
+            rulesEl.textContent = "";
+            noticeWarningEl.style.display = "none";
+            return;
+          }
+
+          rulesEl.textContent = `Default allowance: ${type.default_allowance_days} days · Notice required: ${type.notice_days_required} days · Cover required: ${type.requires_cover ? "yes" : "no"}`;
+
+          const balance = balances.find((b) => b.leave_type_id === type.id);
+          balanceHint.textContent = balance
+            ? `Remaining balance for this leave type: ${balance.remaining} days`
+            : "No balance allocated yet for this leave type this year.";
+
+          if (startInput.value) {
+            const noticeDays = Math.round((new Date(startInput.value) - new Date(todayIso)) / (1000 * 60 * 60 * 24));
+            if (noticeDays < type.notice_days_required) {
+              noticeWarningEl.textContent = `This leave type requires ${type.notice_days_required} days' notice — your selected start date is inside that window. The server may reject this submission.`;
+              noticeWarningEl.style.display = "block";
+            } else {
+              noticeWarningEl.style.display = "none";
+            }
+          }
+        }
+
+        function updateDaysEstimate() {
+          if (!startInput.value || !endInput.value) {
+            daysEstimateEl.textContent = "";
+            return;
+          }
+          const estimate = estimateWorkingDays(startInput.value, endInput.value);
+          daysEstimateEl.textContent = `Estimated working days: ${estimate} (excludes weekends only — the server's final count also excludes public holidays).`;
+        }
+
+        typeSelect.addEventListener("change", () => {
+          updateRulesAndWarning();
+          updateCoverField();
+        });
+        startInput.addEventListener("change", () => {
+          updateRulesAndWarning();
+          updateDaysEstimate();
+        });
+        endInput.addEventListener("change", updateDaysEstimate);
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          errorEl.style.display = "none";
+
+          const type = selectedType();
+          const payload = {
+            leaveTypeId: typeSelect.value,
+            startDate: startInput.value,
+            endDate: endInput.value,
+          };
+
+          if (type?.requires_cover) {
+            if (!coverSelect.value) {
+              errorEl.textContent = "Select a cover employee for this leave type.";
+              errorEl.style.display = "block";
+              return;
+            }
+            payload.coverEmployeeId = coverSelect.value;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Submitting…";
+
+          try {
+            const res = await apiPost("/leave-requests", payload);
+            const leaveRequest = res?.data?.response?.leaveRequest;
+            window.location.href = `/html/app/employee/leave-request-detail.html?id=${leaveRequest.id}`;
+          } catch (err) {
+            errorEl.textContent = err.message || "Failed to submit leave request.";
+            errorEl.style.display = "block";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Submit request";
+          }
+        });
+      }
+
+      loadInitialData();
+    </script>
+  </body>
+</html>

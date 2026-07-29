@@ -106,8 +106,8 @@
           const viewAllHref = isPrivileged
             ? "/html/app/all-leave-requests.html"
             : isManager
-              ? "/html/app/team-leave-approvals.html"
-              : "/html/app/my-leave-requests.html";
+              ? "/html/app/manager/team-approvals.html"
+              : "/html/app/employee/leave-requests.html";
 
           if (rows.length === 0) {
             el.innerHTML = `
@@ -272,7 +272,7 @@
               <div class="panel-meta">
                 Gross: ${escapeHtml(payslip.gross_pay)} &middot; Net: ${escapeHtml(payslip.net_pay)}
               </div>
-              <div class="panel-footer"><a href="/html/app/my-payslips.html">View all &rarr;</a></div>
+              <div class="panel-footer"><a href="/html/app/employee/payslips.html">View all &rarr;</a></div>
             `;
             wirePicker();
           })
