@@ -7,7 +7,7 @@ import {
   PublicHolidays,
   Roles,
 } from "../../database/utils/database.js";
-import type { EmployeeId } from "../../types.js";
+import type { EmployeeId, UserId } from "../../types.js";
 
 jest.mock("../../database/utils/database.js", () => ({
   Employees: { getEmployeeById: jest.fn() },
@@ -264,7 +264,7 @@ describe("submitLeaveRequest", () => {
       endDate: daysFromNow(11),
       coverEmployeeId: "cover-1" as EmployeeId,
       autoApprove: true,
-      requestedByUserId: "hr-user-1",
+      requestedByUserId: "hr-user-1" as UserId,
     });
 
     expect(LeaveRequests.approveLeaveRequest).toHaveBeenCalledWith(
@@ -287,7 +287,7 @@ describe("submitLeaveRequest", () => {
       startDate: daysFromNow(10),
       endDate: daysFromNow(11),
       coverEmployeeId: "cover-1" as EmployeeId,
-      requestedByUserId: "hr-user-1",
+      requestedByUserId: "hr-user-1" as UserId,
     });
 
     expect(LeaveRequests.approveLeaveRequest).not.toHaveBeenCalled();

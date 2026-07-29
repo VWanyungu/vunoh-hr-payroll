@@ -1,4 +1,4 @@
-import knex from 'knex';
+import knex, { type Knex } from 'knex';
 import pg from 'pg';
 import config from '../../knexfile.js';
 
@@ -7,7 +7,7 @@ import config from '../../knexfile.js';
 // dates as raw 'YYYY-MM-DD' strings instead.
 pg.types.setTypeParser(pg.types.builtins.DATE, (value) => value);
 
-const env = process.env.NODE_ENV || 'development';
-const db = knex(config[env]);
+const env = (process.env.NODE_ENV || 'development') as keyof typeof config;
+const db = knex(config[env] as Knex.Config);
 
 export default db

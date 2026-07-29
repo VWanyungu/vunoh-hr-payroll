@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function () {
-        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var root = /^\/frontend(\/|$)/.test(location.pathname)
+          ? "/frontend/"
+          : "/";
         var base = document.createElement("base");
         base.href = root;
         document.head.appendChild(base);
@@ -27,18 +29,40 @@
     </style>
   </head>
   <body>
-    <div style="display: flex;">
+    <div style="display: flex">
       <div id="sidebar-slot"></div>
-      <div style="flex: 1;">
+      <div style="flex: 1">
         <div id="topbar-slot"></div>
-        <main style="padding: var(--space-8);">
+        <main style="padding: var(--space-8)">
           <div class="card">
             <div class="status-pills" id="status-pills">
-              <button class="btn btn-secondary status-pill active" data-status="pending">Pending</button>
-              <button class="btn btn-secondary status-pill" data-status="approved">Approved</button>
-              <button class="btn btn-secondary status-pill" data-status="rejected">Rejected</button>
-              <button class="btn btn-secondary status-pill" data-status="cancelled">Cancelled</button>
-              <button class="btn btn-secondary status-pill" data-status="">All</button>
+              <button
+                class="btn btn-secondary status-pill active"
+                data-status="pending"
+              >
+                Pending
+              </button>
+              <button
+                class="btn btn-secondary status-pill"
+                data-status="approved"
+              >
+                Approved
+              </button>
+              <button
+                class="btn btn-secondary status-pill"
+                data-status="rejected"
+              >
+                Rejected
+              </button>
+              <button
+                class="btn btn-secondary status-pill"
+                data-status="cancelled"
+              >
+                Cancelled
+              </button>
+              <button class="btn btn-secondary status-pill" data-status="">
+                All
+              </button>
             </div>
             <div id="requests-list"><p>Loading…</p></div>
           </div>
@@ -53,17 +77,27 @@
       requireRole(["manager"]);
 
       const roles = getRoleNames();
-      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "team-leave-approvals");
-      document.getElementById("topbar-slot").innerHTML = renderTopbar("Team Leave Approvals");
-      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
-        e.preventDefault();
-        try {
-          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
-        } finally {
-          clearTokens();
-          window.location.href = "html/public/login.html";
-        }
-      });
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(
+        roles,
+        "team-leave-approvals",
+      );
+      document.getElementById("topbar-slot").innerHTML = renderTopbar(
+        "Team Leave Approvals",
+      );
+      document
+        .querySelector('[data-action="logout"]')
+        .addEventListener("click", async (e) => {
+          e.preventDefault();
+          try {
+            await apiPost("/logout", {
+              token: getAccessToken(),
+              refreshToken: getRefreshToken(),
+            });
+          } finally {
+            clearTokens();
+            window.location.href = "html/public/login.html";
+          }
+        });
 
       const listEl = document.getElementById("requests-list");
 
@@ -71,7 +105,9 @@
         .then((res) => {
           const types = res?.data?.response?.leaveTypes || [];
           const map = {};
-          types.forEach((t) => { map[t.id] = t.name || t.code; });
+          types.forEach((t) => {
+            map[t.id] = t.name || t.code;
+          });
           return map;
         })
         .catch(() => ({}));
@@ -95,8 +131,9 @@
           }
 
           const table = renderTable(
-            ["Leave Type", "Dates", "Working Days", "Status"],
+            ["Employee", "Leave Type", "Dates", "Working Days", "Status"],
             rows.map((r) => [
+              escapeHtml(r.employee_name),
               escapeHtml(leaveTypeNames[r.leave_type_id] || r.leave_type_id),
               `${escapeHtml(r.start_date)} – ${escapeHtml(r.end_date)}`,
               escapeHtml(r.working_days_count),
@@ -120,7 +157,9 @@
         const btn = e.target.closest("[data-status]");
         if (!btn) return;
 
-        document.querySelectorAll(".status-pill").forEach((el) => el.classList.remove("active"));
+        document
+          .querySelectorAll(".status-pill")
+          .forEach((el) => el.classList.remove("active"));
         btn.classList.add("active");
         loadRequests(btn.dataset.status);
       });

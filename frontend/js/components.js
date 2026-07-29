@@ -9,25 +9,20 @@ const SIDEBAR_NAV_ITEMS = [
     id: "my-profile",
     label: "My Profile",
     href: "html/app/my-profile.html",
-    roles: ["employee", "manager", "hr_admin", "super_admin"],
+    roles: ["employee", "manager"],
   },
   {
     id: "my-leave-requests",
     label: "My Leave Requests",
     href: "html/app/employee/leave-requests.html",
-    roles: ["employee", "manager", "hr_admin", "super_admin"],
+    // roles: ["employee", "manager", "hr_admin", "super_admin"],
+    roles: ["employee"],
   },
   {
     id: "my-payslips",
     label: "My Payslips",
     href: "html/app/employee/payslips.html",
-    roles: ["employee", "manager", "hr_admin", "super_admin"],
-  },
-  {
-    id: "leave-policy",
-    label: "Leave Policy",
-    href: "html/app/leave-policy.html",
-    roles: ["employee", "manager", "hr_admin", "super_admin"],
+    roles: ["employee", "manager"],
   },
   {
     id: "team-directory",
@@ -88,6 +83,12 @@ const SIDEBAR_NAV_ITEMS = [
     label: "All Payslips",
     href: "html/app/admin/all-payslips.html",
     roles: ["hr_admin", "super_admin"],
+  },
+  {
+    id: "leave-policy",
+    label: "Leave Policy",
+    href: "html/app/leave-policy.html",
+    roles: ["employee", "manager", "hr_admin", "super_admin"],
   },
 ];
 

@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function () {
-        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var root = /^\/frontend(\/|$)/.test(location.pathname)
+          ? "/frontend/"
+          : "/";
         var base = document.createElement("base");
         base.href = root;
         document.head.appendChild(base);
@@ -38,12 +40,12 @@
     </style>
   </head>
   <body>
-    <div style="display: flex;">
+    <div style="display: flex">
       <div id="sidebar-slot"></div>
-      <div style="flex: 1;">
+      <div style="flex: 1">
         <div id="topbar-slot"></div>
-        <main style="padding: var(--space-8);">
-          <div class="card" style="max-width: 560px;" id="profile-panel">
+        <main style="padding: var(--space-8)">
+          <div class="card" style="max-width: 560px" id="profile-panel">
             <p>Loading…</p>
           </div>
         </main>
@@ -57,17 +59,27 @@
       requireRole(["manager"]);
 
       const roles = getRoleNames();
-      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-team-roster");
-      document.getElementById("topbar-slot").innerHTML = renderTopbar("Team Member Profile");
-      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
-        e.preventDefault();
-        try {
-          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
-        } finally {
-          clearTokens();
-          window.location.href = "html/public/login.html";
-        }
-      });
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(
+        roles,
+        "my-team-roster",
+      );
+      document.getElementById("topbar-slot").innerHTML = renderTopbar(
+        "Team Member Profile",
+      );
+      document
+        .querySelector('[data-action="logout"]')
+        .addEventListener("click", async (e) => {
+          e.preventDefault();
+          try {
+            await apiPost("/logout", {
+              token: getAccessToken(),
+              refreshToken: getRefreshToken(),
+            });
+          } finally {
+            clearTokens();
+            window.location.href = "html/public/login.html";
+          }
+        });
 
       const panel = document.getElementById("profile-panel");
       const employeeId = new URLSearchParams(window.location.search).get("id");
@@ -105,6 +117,9 @@
           }
 
           const rows = [
+            fieldRow("Name", employee.name),
+            fieldRow("Email", employee.email),
+            fieldRow("Manager", employee.manager_name),
             fieldRow("Job title", employee.job_title),
             fieldRow("Team", teamName),
             fieldRow("Start date", employee.start_date),
@@ -117,9 +132,12 @@
           // Field-sensitivity rule (§5): the API strips salary/resume/national
           // ID for a manager viewing a report's record — omit these fields
           // entirely here rather than rendering them blank.
-          if (employee.salary !== undefined) rows.push(fieldRow("Salary", employee.salary));
-          if (employee.resume !== undefined) rows.push(fieldRow("Resume", employee.resume || "—"));
-          if (employee.national_id !== undefined) rows.push(fieldRow("National ID", employee.national_id));
+          if (employee.salary !== undefined)
+            rows.push(fieldRow("Salary", employee.salary));
+          if (employee.resume !== undefined)
+            rows.push(fieldRow("Resume", employee.resume || "—"));
+          if (employee.national_id !== undefined)
+            rows.push(fieldRow("National ID", employee.national_id));
 
           panel.innerHTML = `
             <h2 class="card-title">Team Member Profile</h2>
