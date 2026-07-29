@@ -62,7 +62,7 @@ const SIDEBAR_NAV_ITEMS = [
   {
     id: "teams",
     label: "Teams",
-    href: "/html/app/teams.html",
+    href: "/html/app/admin/teams.html",
     roles: ["hr_admin", "super_admin"],
   },
   {

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create Team — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 420px;">
+            <h2 class="card-title">Create Team</h2>
+            <form id="create-team-form">
+              <div class="input-group" style="margin-bottom: var(--space-4);">
+                <label class="input-label" for="team-name">Name</label>
+                <input class="input-field" id="team-name" type="text" required maxlength="100" />
+              </div>
+              <p id="create-error" class="input-error-message" style="display: none; margin-bottom: var(--space-4);"></p>
+              <button class="btn btn-primary" type="submit" id="create-submit" style="width: 100%;">Create team</button>
+            </form>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "teams");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Create Team");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const form = document.getElementById("create-team-form");
+      const errorEl = document.getElementById("create-error");
+      const submitBtn = document.getElementById("create-submit");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorEl.style.display = "none";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Creating…";
+
+        try {
+          const res = await apiPost("/teams", { name: document.getElementById("team-name").value.trim() });
+          const team = res?.data?.response?.team;
+
+          // POST /v1/teams currently swallows a duplicate-name DB error
+          // internally and still responds 200 with `team: null` instead of an
+          // error status — apiPost won't throw for that, so it's checked here.
+          if (!team) {
+            throw new Error("A team with this name already exists.");
+          }
+
+          window.location.href = `/html/app/admin/team-detail.html?id=${team.id}`;
+        } catch (err) {
+          errorEl.textContent = err.message || "Failed to create team.";
+          errorEl.style.display = "block";
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Create team";
+        }
+      });
+    </script>
+  </body>
+</html>
