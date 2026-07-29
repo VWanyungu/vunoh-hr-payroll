@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function () {
-        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var root = /^\/frontend(\/|$)/.test(location.pathname)
+          ? "/frontend/"
+          : "/";
         var base = document.createElement("base");
         base.href = root;
         document.head.appendChild(base);
@@ -49,11 +51,11 @@
     </style>
   </head>
   <body>
-    <div style="display: flex;">
+    <div style="display: flex">
       <div id="sidebar-slot"></div>
-      <div style="flex: 1;">
+      <div style="flex: 1">
         <div id="topbar-slot"></div>
-        <main style="padding: var(--space-8);">
+        <main style="padding: var(--space-8)">
           <div class="payslips-layout">
             <section class="card">
               <div class="period-filter">
@@ -65,9 +67,18 @@
                 </div>
                 <div class="input-group">
                   <label class="input-label" for="filter-year">Year</label>
-                  <input class="input-field" id="filter-year" type="number" min="2000" max="2100" style="width: 110px;" />
+                  <input
+                    class="input-field"
+                    id="filter-year"
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    style="width: 110px"
+                  />
                 </div>
-                <button class="btn btn-secondary" id="clear-filter-btn">Clear</button>
+                <button class="btn btn-secondary" id="clear-filter-btn">
+                  Clear
+                </button>
               </div>
               <div id="payslips-list"><p>Loading…</p></div>
             </section>
@@ -88,17 +99,26 @@
       requireAuth();
 
       const roles = getRoleNames();
-      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-payslips");
-      document.getElementById("topbar-slot").innerHTML = renderTopbar("My Payslips");
-      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
-        e.preventDefault();
-        try {
-          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
-        } finally {
-          clearTokens();
-          window.location.href = "html/public/login.html";
-        }
-      });
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(
+        roles,
+        "my-payslips",
+      );
+      document.getElementById("topbar-slot").innerHTML =
+        renderTopbar("My Payslips");
+      document
+        .querySelector('[data-action="logout"]')
+        .addEventListener("click", async (e) => {
+          e.preventDefault();
+          try {
+            await apiPost("/logout", {
+              token: getAccessToken(),
+              refreshToken: getRefreshToken(),
+            });
+          } finally {
+            clearTokens();
+            window.location.href = "html/public/login.html";
+          }
+        });
 
       const listEl = document.getElementById("payslips-list");
       const detailPanel = document.getElementById("payslip-detail-panel");
@@ -108,7 +128,10 @@
       monthSelect.innerHTML =
         `<option value="">Any</option>` +
         Array.from({ length: 12 }, (_, i) => i + 1)
-          .map((m) => `<option value="${m}">${String(m).padStart(2, "0")}</option>`)
+          .map(
+            (m) =>
+              `<option value="${m}">${String(m).padStart(2, "0")}</option>`,
+          )
           .join("");
 
       async function loadPayslips() {
@@ -129,8 +152,9 @@
           }
 
           const table = renderTable(
-            ["Period", "Gross", "Net", "Version"],
+            ["Employee", "Period", "Gross", "Net", "Version"],
             rows.map((p) => [
+              escapeHtml(p.employee_name),
               `${String(p.period_month).padStart(2, "0")}/${p.period_year}`,
               escapeHtml(p.gross_pay),
               escapeHtml(p.net_pay),
@@ -171,6 +195,7 @@
 
           detailPanel.innerHTML = `
             <h3 class="card-title">Payslip Detail</h3>
+            ${fieldRow("Employee", payslip.employee_name)}
             ${fieldRow("Period", `${String(payslip.period_month).padStart(2, "0")}/${payslip.period_year}`)}
             ${fieldRow("Gross pay", payslip.gross_pay)}
             ${fieldRow("Unpaid leave days", payslip.unpaid_leave_days)}
@@ -195,11 +220,13 @@
 
       monthSelect.addEventListener("change", loadPayslips);
       yearInput.addEventListener("change", loadPayslips);
-      document.getElementById("clear-filter-btn").addEventListener("click", () => {
-        monthSelect.value = "";
-        yearInput.value = "";
-        loadPayslips();
-      });
+      document
+        .getElementById("clear-filter-btn")
+        .addEventListener("click", () => {
+          monthSelect.value = "";
+          yearInput.value = "";
+          loadPayslips();
+        });
 
       loadPayslips();
     </script>

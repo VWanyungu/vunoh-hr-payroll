@@ -18,7 +18,7 @@ const app = express();
 
 const corsOrigins = process.env.CORS_ALLOWED_ORIGINS
   ? process.env.CORS_ALLOWED_ORIGINS.split(",").map((origin) => origin.trim())
-  : [process.env.FRONTEND_URL || "http://127.0.0.1:5500"];
+  : [process.env.FRONTEND_URL || "https://vunoh-hr-payroll.netlify.app/"];
 
 const corsOptions = {
   origin: (
@@ -36,7 +36,8 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-const frontendUrl = process.env.FRONTEND_URL || "http://127.0.0.1:5500";
+const frontendUrl =
+  process.env.FRONTEND_URL || "https://vunoh-hr-payroll.netlify.app/";
 
 app.use(
   helmet({

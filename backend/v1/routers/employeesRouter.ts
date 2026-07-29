@@ -78,6 +78,32 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
   }
 });
 
+router.get("/me", async (req: AuthenticatedRequest, res) => {
+  try {
+    const employee = await resolveEmployeeForUser(req.user!);
+
+    if (!employee) {
+      return res.status(404).json({
+        status: "error",
+        data: null,
+        message: "No employee record linked to this account",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: { response: { employee: sanitizeEmployee(employee, req.user!) } },
+      message: "Employee retrieved successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      data: null,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
 router.get("/:employeeId", async (req, res) => {
   const user = (req as AuthenticatedRequest).user;
 

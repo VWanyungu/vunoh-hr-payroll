@@ -9,25 +9,20 @@ const SIDEBAR_NAV_ITEMS = [
     id: "my-profile",
     label: "My Profile",
     href: "html/app/my-profile.html",
-    roles: ["employee", "manager", "hr_admin", "super_admin"],
+    roles: ["employee", "manager"],
   },
   {
     id: "my-leave-requests",
     label: "My Leave Requests",
     href: "html/app/employee/leave-requests.html",
-    roles: ["employee", "manager", "hr_admin", "super_admin"],
+    // roles: ["employee", "manager", "hr_admin", "super_admin"],
+    roles: ["employee"],
   },
   {
     id: "my-payslips",
     label: "My Payslips",
     href: "html/app/employee/payslips.html",
-    roles: ["employee", "manager", "hr_admin", "super_admin"],
-  },
-  {
-    id: "leave-policy",
-    label: "Leave Policy",
-    href: "html/app/leave-policy.html",
-    roles: ["employee", "manager", "hr_admin", "super_admin"],
+    roles: ["employee", "manager"],
   },
   {
     id: "team-directory",
@@ -89,6 +84,12 @@ const SIDEBAR_NAV_ITEMS = [
     href: "html/app/admin/all-payslips.html",
     roles: ["hr_admin", "super_admin"],
   },
+  {
+    id: "leave-policy",
+    label: "Leave Policy",
+    href: "html/app/leave-policy.html",
+    roles: ["employee", "manager", "hr_admin", "super_admin"],
+  },
 ];
 
 const BADGE_STATUS_CLASSES = {
@@ -107,8 +108,17 @@ function escapeHtml(value) {
   );
 }
 
+const ROLE_LABELS = {
+  super_admin: "Super Admin",
+  hr_admin: "HR Admin",
+  manager: "Manager",
+  employee: "Employee",
+};
+
 function renderSidebar(role, activeItem) {
   const roles = Array.isArray(role) ? role : [role];
+
+  const roleLabel = roles.map((r) => ROLE_LABELS[r] || r).join(", ");
 
   const items = SIDEBAR_NAV_ITEMS.filter((item) =>
     item.roles.some((allowed) => roles.includes(allowed)),
@@ -122,6 +132,7 @@ function renderSidebar(role, activeItem) {
   return `
     <nav class="sidebar">
       <div class="sidebar-brand">Vunoh HR</div>
+      ${roleLabel ? `<div class="sidebar-role">${escapeHtml(roleLabel)}</div>` : ""}
       ${items}
       <a class="sidebar-nav-item" href="#" data-action="logout">Log out</a>
     </nav>
