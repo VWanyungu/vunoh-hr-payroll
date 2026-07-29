@@ -107,8 +107,17 @@ function escapeHtml(value) {
   );
 }
 
+const ROLE_LABELS = {
+  super_admin: "Super Admin",
+  hr_admin: "HR Admin",
+  manager: "Manager",
+  employee: "Employee",
+};
+
 function renderSidebar(role, activeItem) {
   const roles = Array.isArray(role) ? role : [role];
+
+  const roleLabel = roles.map((r) => ROLE_LABELS[r] || r).join(", ");
 
   const items = SIDEBAR_NAV_ITEMS.filter((item) =>
     item.roles.some((allowed) => roles.includes(allowed)),
@@ -122,6 +131,7 @@ function renderSidebar(role, activeItem) {
   return `
     <nav class="sidebar">
       <div class="sidebar-brand">Vunoh HR</div>
+      ${roleLabel ? `<div class="sidebar-role">${escapeHtml(roleLabel)}</div>` : ""}
       ${items}
       <a class="sidebar-nav-item" href="#" data-action="logout">Log out</a>
     </nav>

@@ -597,15 +597,23 @@ export class Employees {
     try {
       const employeesQuery = db("employees")
         .innerJoin("users", "employees.user_id", "users.id")
+        .leftJoin("employees as manager", "employees.manager_id", "manager.id")
+        .leftJoin("users as manager_user", "manager.user_id", "manager_user.id")
         .select(EMPLOYEE_COLUMNS_QUALIFIED)
-        .select("users.name as name", "users.email as email");
-      employeesQuery.where("deleted", false);
-      if (team) employeesQuery.where("team_id", team);
-      if (manager) employeesQuery.where("manager_id", manager);
+        .select(
+          "users.name as name",
+          "users.email as email",
+          "manager_user.name as manager_name",
+        );
+      employeesQuery.where("employees.deleted", false);
+      if (team) employeesQuery.where("employees.team_id", team);
+      if (manager) employeesQuery.where("employees.manager_id", manager);
       if (employmentType)
-        employeesQuery.where("employment_type", employmentType);
-      if (isActive !== undefined) employeesQuery.where("is_active", isActive);
-      if (search) employeesQuery.where("job_title", "ilike", `%${search}%`);
+        employeesQuery.where("employees.employment_type", employmentType);
+      if (isActive !== undefined)
+        employeesQuery.where("employees.is_active", isActive);
+      if (search)
+        employeesQuery.where("employees.job_title", "ilike", `%${search}%`);
 
       if (page !== undefined || limit !== undefined) {
         const resolvedPage = page ?? 1;
@@ -678,10 +686,16 @@ export class Employees {
     try {
       const employee = await db("employees")
         .innerJoin("users", "employees.user_id", "users.id")
+        .leftJoin("employees as manager", "employees.manager_id", "manager.id")
+        .leftJoin("users as manager_user", "manager.user_id", "manager_user.id")
         .select(EMPLOYEE_COLUMNS_QUALIFIED)
-        .select("users.name as name", "users.email as email")
+        .select(
+          "users.name as name",
+          "users.email as email",
+          "manager_user.name as manager_name",
+        )
         .where("employees.id", id)
-        .where("deleted", false)
+        .where("employees.deleted", false)
         .first();
 
       return { employee: employee ?? null };
@@ -694,10 +708,16 @@ export class Employees {
     try {
       const employee = await db("employees")
         .innerJoin("users", "employees.user_id", "users.id")
+        .leftJoin("employees as manager", "employees.manager_id", "manager.id")
+        .leftJoin("users as manager_user", "manager.user_id", "manager_user.id")
         .select(EMPLOYEE_COLUMNS_QUALIFIED)
-        .select("users.name as name", "users.email as email")
+        .select(
+          "users.name as name",
+          "users.email as email",
+          "manager_user.name as manager_name",
+        )
         .where("employees.user_id", userId)
-        .where("deleted", false)
+        .where("employees.deleted", false)
         .first();
 
       return { employee: employee ?? null };
@@ -831,6 +851,33 @@ const LEAVE_REQUEST_COLUMNS = [
   "updated_at",
 ];
 
+const LEAVE_REQUEST_COLUMNS_QUALIFIED = LEAVE_REQUEST_COLUMNS.map(
+  (c) => `leave_requests.${c}`,
+);
+
+function withLeaveRequestNameJoins(query: ReturnType<typeof db>) {
+  return query
+    .leftJoin("employees", "leave_requests.employee_id", "employees.id")
+    .leftJoin("users", "employees.user_id", "users.id")
+    .leftJoin(
+      "employees as cover_employee",
+      "leave_requests.cover_employee_id",
+      "cover_employee.id",
+    )
+    .leftJoin(
+      "users as cover_user",
+      "cover_employee.user_id",
+      "cover_user.id",
+    )
+    .leftJoin("users as approver", "leave_requests.approver_id", "approver.id")
+    .select(LEAVE_REQUEST_COLUMNS_QUALIFIED)
+    .select(
+      "users.name as employee_name",
+      "cover_user.name as cover_employee_name",
+      "approver.name as approver_name",
+    );
+}
+
 export class LeaveRequests {
   static async getAllLeaveRequests({
     page,
@@ -857,12 +904,13 @@ export class LeaveRequests {
         }
       };
 
-      const leaveRequestsQuery = db("leave_requests").select(
-        LEAVE_REQUEST_COLUMNS,
+      const leaveRequestsQuery = withLeaveRequestNameJoins(
+        db("leave_requests"),
       );
       applyScope(leaveRequestsQuery);
-      if (employeeId) leaveRequestsQuery.where("employee_id", employeeId);
-      if (status) leaveRequestsQuery.where("status", status);
+      if (employeeId)
+        leaveRequestsQuery.where("leave_requests.employee_id", employeeId);
+      if (status) leaveRequestsQuery.where("leave_requests.status", status);
 
       if (page !== undefined || limit !== undefined) {
         const resolvedPage = page ?? 1;
@@ -910,9 +958,10 @@ export class LeaveRequests {
 
   static async getLeaveRequestById(id: string) {
     try {
-      const leaveRequest = await db("leave_requests")
-        .select(LEAVE_REQUEST_COLUMNS)
-        .where("id", id)
+      const leaveRequest = await withLeaveRequestNameJoins(
+        db("leave_requests"),
+      )
+        .where("leave_requests.id", id)
         .first();
 
       return { leaveRequest: leaveRequest ?? null };
@@ -1191,6 +1240,18 @@ const LEAVE_BALANCE_COLUMNS = [
   "updated_at",
 ];
 
+const LEAVE_BALANCE_COLUMNS_QUALIFIED = LEAVE_BALANCE_COLUMNS.map(
+  (c) => `leave_balances.${c}`,
+);
+
+function withLeaveBalanceNameJoin(query: ReturnType<typeof db>) {
+  return query
+    .leftJoin("employees", "leave_balances.employee_id", "employees.id")
+    .leftJoin("users", "employees.user_id", "users.id")
+    .select(LEAVE_BALANCE_COLUMNS_QUALIFIED)
+    .select("users.name as employee_name");
+}
+
 export class LeaveBalances {
   static async getAllLeaveBalances({
     page,
@@ -1200,12 +1261,14 @@ export class LeaveBalances {
     year,
   }: PaginationInput & LeaveBalanceFilters) {
     try {
-      const leaveBalancesQuery = db("leave_balances").select(
-        LEAVE_BALANCE_COLUMNS,
+      const leaveBalancesQuery = withLeaveBalanceNameJoin(
+        db("leave_balances"),
       );
-      if (employeeId) leaveBalancesQuery.where("employee_id", employeeId);
-      if (leaveTypeId) leaveBalancesQuery.where("leave_type_id", leaveTypeId);
-      if (year) leaveBalancesQuery.where("year", year);
+      if (employeeId)
+        leaveBalancesQuery.where("leave_balances.employee_id", employeeId);
+      if (leaveTypeId)
+        leaveBalancesQuery.where("leave_balances.leave_type_id", leaveTypeId);
+      if (year) leaveBalancesQuery.where("leave_balances.year", year);
 
       if (page !== undefined || limit !== undefined) {
         const resolvedPage = page ?? 1;
@@ -1250,9 +1313,10 @@ export class LeaveBalances {
 
   static async getLeaveBalanceById(id: string) {
     try {
-      const leaveBalance = await db("leave_balances")
-        .select(LEAVE_BALANCE_COLUMNS)
-        .where("id", id)
+      const leaveBalance = await withLeaveBalanceNameJoin(
+        db("leave_balances"),
+      )
+        .where("leave_balances.id", id)
         .first();
 
       return { leaveBalance: leaveBalance ?? null };
@@ -1358,6 +1422,20 @@ const PAYSLIP_COLUMNS = [
   "updated_at",
 ];
 
+const PAYSLIP_COLUMNS_QUALIFIED = PAYSLIP_COLUMNS.map((c) => `payslips.${c}`);
+
+function withPayslipNameJoins(query: ReturnType<typeof db>) {
+  return query
+    .leftJoin("employees", "payslips.employee_id", "employees.id")
+    .leftJoin("users", "employees.user_id", "users.id")
+    .leftJoin("users as generator", "payslips.generated_by", "generator.id")
+    .select(PAYSLIP_COLUMNS_QUALIFIED)
+    .select(
+      "users.name as employee_name",
+      "generator.name as generated_by_name",
+    );
+}
+
 export class Payslips {
   static async createPayslip(input: CreatePayslipInput, trx: typeof db = db) {
     try {
@@ -1394,11 +1472,13 @@ export class Payslips {
     payslipId,
   }: PaginationInput & PayslipFilters) {
     try {
-      const query = db("payslips").select(PAYSLIP_COLUMNS);
-      if (employeeId) query.where("employee_id", employeeId);
-      if (periodMonth !== undefined) query.where("period_month", periodMonth);
-      if (periodYear !== undefined) query.where("period_year", periodYear);
-      if (payslipId) query.where("id", payslipId);
+      const query = withPayslipNameJoins(db("payslips"));
+      if (employeeId) query.where("payslips.employee_id", employeeId);
+      if (periodMonth !== undefined)
+        query.where("payslips.period_month", periodMonth);
+      if (periodYear !== undefined)
+        query.where("payslips.period_year", periodYear);
+      if (payslipId) query.where("payslips.id", payslipId);
 
       const order: {
         column: string;

@@ -126,7 +126,7 @@
           <h2 class="card-title">Employee Detail</h2>
           ${fieldRow("Job title", escapeHtml(employee.job_title))}
           ${fieldRow("Team", escapeHtml(teamName))}
-          ${fieldRow("Manager ID", employee.manager_id ? escapeHtml(employee.manager_id) : "—")}
+          ${fieldRow("Manager", employee.manager_name ? escapeHtml(employee.manager_name) : "—")}
           ${fieldRow("Start date", escapeHtml(employee.start_date))}
           ${fieldRow("Salary", escapeHtml(employee.salary))}
           ${fieldRow("Employment type", escapeHtml(employee.employment_type))}
