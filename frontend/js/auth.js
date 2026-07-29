@@ -36,6 +36,19 @@ function getRoleNames() {
   return decodeRoles().map((r) => r.role);
 }
 
+/** Decodes the `userId` claim from the access token, or null if absent/invalid. */
+function getUserId() {
+  const token = getAccessToken();
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function requireAuth() {
   if (!getAccessToken()) {
     window.location.href = "/html/public/login.html";

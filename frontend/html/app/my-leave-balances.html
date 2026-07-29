@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Leave Balances — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .year-picker {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        margin-bottom: var(--space-4);
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" id="balances-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireAuth();
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-leave-balances");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("My Leave Balances");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("balances-panel");
+      const currentYear = new Date().getFullYear();
+
+      const leaveTypeNamesPromise = apiGet("/leave-types")
+        .then((res) => {
+          const types = res?.data?.response?.leaveTypes || [];
+          const map = {};
+          types.forEach((t) => { map[t.id] = t.name || t.code; });
+          return map;
+        })
+        .catch(() => ({}));
+
+      function yearPicker(year) {
+        return `
+          <div class="year-picker">
+            <label class="input-label" for="balance-year">Year</label>
+            <input class="input-field" id="balance-year" type="number" min="2000" max="2100" value="${year}" style="width: 120px;" />
+          </div>
+        `;
+      }
+
+      async function loadBalances(year) {
+        panel.innerHTML = `<h2 class="card-title">My Leave Balances</h2>${yearPicker(year)}<p>Loading…</p>`;
+        wireYearInput();
+
+        try {
+          const [res, leaveTypeNames] = await Promise.all([
+            apiGet(`/leave-balances?year=${year}`),
+            leaveTypeNamesPromise,
+          ]);
+          const rows = res?.data?.response?.leaveBalances || [];
+
+          if (rows.length === 0) {
+            panel.innerHTML = `
+              <h2 class="card-title">My Leave Balances</h2>
+              ${yearPicker(year)}
+              <p>No balance allocated yet for ${year}.</p>
+            `;
+            wireYearInput();
+            return;
+          }
+
+          const table = renderTable(
+            ["Leave Type", "Allocated", "Used", "Remaining"],
+            rows.map((r) => [
+              escapeHtml(leaveTypeNames[r.leave_type_id] || r.leave_type_id),
+              escapeHtml(r.allocated),
+              escapeHtml(r.used),
+              escapeHtml(r.remaining),
+            ]),
+          );
+
+          panel.innerHTML = `
+            <h2 class="card-title">My Leave Balances</h2>
+            ${yearPicker(year)}
+            ${table}
+          `;
+          wireYearInput();
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">My Leave Balances</h2>
+            ${yearPicker(year)}
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load leave balances.")}</p>
+          `;
+          wireYearInput();
+        }
+      }
+
+      function wireYearInput() {
+        const input = document.getElementById("balance-year");
+        let debounce;
+        input.addEventListener("change", () => {
+          clearTimeout(debounce);
+          debounce = setTimeout(() => loadBalances(Number(input.value) || currentYear), 200);
+        });
+      }
+
+      loadBalances(currentYear);
+    </script>
+  </body>
+</html>
