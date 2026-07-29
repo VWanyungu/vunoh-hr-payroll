@@ -3,10 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
     <title>Log in — Vunoh HR Payroll</title>
-    <link rel="stylesheet" href="../../css/tokens.css" />
-    <link rel="stylesheet" href="../../css/base.css" />
-    <link rel="stylesheet" href="../../css/components.css" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
   </head>
   <body>
     <main
@@ -60,17 +68,17 @@
         </form>
 
         <p style="margin-top: var(--space-5); font-size: var(--text-sm)">
-          <a href="/html/public/forgot-password.html">Forgot password?</a>
+          <a href="html/public/forgot-password.html">Forgot password?</a>
         </p>
         <p style="font-size: var(--text-sm)">
           Don't have an account?
-          <a href="/html/public/register.html">Register</a>
+          <a href="html/public/register.html">Register</a>
         </p>
       </div>
     </main>
 
-    <script src="/js/auth.js"></script>
-    <script src="/js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
     <script>
       const form = document.getElementById("login-form");
       const errorEl = document.getElementById("login-error");
@@ -88,7 +96,7 @@
 
           const result = await apiPost("/login", { email, password });
           setTokens(result.data.token, result.data.refreshToken);
-          window.location.href = "/html/app/dashboard.html";
+          window.location.href = "html/app/dashboard.html";
         } catch (err) {
           errorEl.textContent = err.message || "Invalid email or password.";
           errorEl.style.display = "block";

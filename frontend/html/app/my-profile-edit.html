@@ -3,10 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
     <title>Edit My Profile — Vunoh HR Payroll</title>
-    <link rel="stylesheet" href="/css/tokens.css" />
-    <link rel="stylesheet" href="/css/base.css" />
-    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
     <style>
       .field-with-upload {
         display: flex;
@@ -40,9 +48,9 @@
       </div>
     </div>
 
-    <script src="/js/auth.js"></script>
-    <script src="/js/api.js"></script>
-    <script src="/js/components.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
     <script>
       requireAuth();
 
@@ -55,7 +63,7 @@
           await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
         } finally {
           clearTokens();
-          window.location.href = "/html/public/login.html";
+          window.location.href = "html/public/login.html";
         }
       });
 
@@ -98,7 +106,7 @@
 
             <div style="display: flex; gap: var(--space-3);">
               <button class="btn btn-primary" type="submit" id="edit-submit">Save changes</button>
-              <a class="btn btn-secondary" href="/html/app/my-profile.html">Cancel</a>
+              <a class="btn btn-secondary" href="html/app/my-profile.html">Cancel</a>
             </div>
           </form>
         `;
@@ -138,7 +146,7 @@
             successEl.textContent = "Profile updated.";
             successEl.style.display = "block";
             setTimeout(() => {
-              window.location.href = "/html/app/my-profile.html";
+              window.location.href = "html/app/my-profile.html";
             }, 800);
           } catch (err) {
             errorEl.textContent = err.message || "Failed to update your profile.";
@@ -153,7 +161,7 @@
         if (!employeeId) {
           panel.innerHTML = `
             <h2 class="card-title">Edit My Profile</h2>
-            <p>Missing employee reference. Go back to <a href="/html/app/my-profile.html">My Profile</a> and use the Edit Profile button from there.</p>
+            <p>Missing employee reference. Go back to <a href="html/app/my-profile.html">My Profile</a> and use the Edit Profile button from there.</p>
           `;
           return;
         }

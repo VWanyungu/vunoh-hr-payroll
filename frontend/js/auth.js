@@ -51,7 +51,7 @@ function getUserId() {
 
 function requireAuth() {
   if (!getAccessToken()) {
-    window.location.href = "/html/public/login.html";
+    window.location.href = "html/public/login.html";
   }
 }
 
@@ -61,6 +61,6 @@ function requireRole(allowedRoles) {
   const roleNames = getRoleNames();
   const hasAccess = allowedRoles.some((role) => roleNames.includes(role));
   if (!hasAccess) {
-    window.location.href = "/html/app/dashboard.html";
+    window.location.href = "html/app/dashboard.html";
   }
 }

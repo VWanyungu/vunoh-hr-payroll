@@ -3,10 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
     <title>Register — Vunoh HR Payroll</title>
-    <link rel="stylesheet" href="../../css/tokens.css" />
-    <link rel="stylesheet" href="../../css/base.css" />
-    <link rel="stylesheet" href="../../css/components.css" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
   </head>
   <body>
     <main
@@ -84,12 +92,12 @@
         </form>
 
         <p style="margin-top: var(--space-5); font-size: var(--text-sm)">
-          Already have an account? <a href="/html/public/login.html">Log in</a>
+          Already have an account? <a href="html/public/login.html">Log in</a>
         </p>
       </div>
     </main>
 
-    <script src="/js/api.js"></script>
+    <script src="js/api.js"></script>
     <script>
       const form = document.getElementById("register-form");
       const errorEl = document.getElementById("register-error");
@@ -125,7 +133,7 @@
             <h2 class="card-title">Registration submitted</h2>
             <p>Your account has been created and is pending approval. An administrator will review and activate it before you can log in.</p>
             <p style="margin-top: var(--space-5); font-size: var(--text-sm);">
-              <a href="/html/public/login.html">Back to log in</a>
+              <a href="html/public/login.html">Back to log in</a>
             </p>
           `;
         } catch (err) {

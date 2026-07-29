@@ -14,7 +14,7 @@ async function apiRequest(method, path, body) {
 
   if (token && (response.status === 401 || response.status === 403)) {
     clearTokens();
-    window.location.href = "/html/public/login.html";
+    window.location.href = "html/public/login.html";
     return Promise.reject(
       new Error(`Request failed with status ${response.status}`),
     );
