@@ -1,9 +1,3 @@
-/**
- * Thin fetch wrapper for the backend API (backend/v1/*, see
- * frontend/FRONTEND_SCREENS.md §1 for the full endpoint inventory — don't
- * call anything not listed there without flagging it first).
- */
-
 const API_BASE_URL = "http://localhost:3000/v1";
 
 async function apiRequest(method, path, body) {
@@ -18,16 +12,20 @@ async function apiRequest(method, path, body) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  if (response.status === 401 || response.status === 403) {
+  if (token && (response.status === 401 || response.status === 403)) {
     clearTokens();
     window.location.href = "/html/public/login.html";
-    return Promise.reject(new Error(`Request failed with status ${response.status}`));
+    return Promise.reject(
+      new Error(`Request failed with status ${response.status}`),
+    );
   }
 
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message = (data && (data.message || data.error)) || `Request failed with status ${response.status}`;
+    const message =
+      (data && (data.message || data.error)) ||
+      `Request failed with status ${response.status}`;
     throw new Error(message);
   }
 

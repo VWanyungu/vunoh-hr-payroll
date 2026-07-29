@@ -1,10 +1,3 @@
-/**
- * Auth helpers: token storage + JWT role decoding.
- *
- * Access token payload shape (see backend/v1/utils/generateJwtToken.ts +
- * backend/v1/types.ts AuthUser): { userId, email, role: { id, role, team_id }[] }
- */
-
 const ACCESS_TOKEN_KEY = "vunoh_access_token";
 const REFRESH_TOKEN_KEY = "vunoh_refresh_token";
 
@@ -26,11 +19,6 @@ function clearTokens() {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
-/**
- * Decodes the access token payload client-side (no signature verification —
- * the server is the source of truth for authorization, this is UI-only).
- * Returns the array of assigned role entries `{ id, role, team_id }`, or [].
- */
 function decodeRoles() {
   const token = getAccessToken();
   if (!token) return [];
