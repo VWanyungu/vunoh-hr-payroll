@@ -18,10 +18,11 @@ export const sendPasswordResetMail = async (mail: PasswordResetMail) => {
     from: process.env.MAIL_FROM,
     to: mail.to,
     subject: mail.subject,
-    html: `<h1>Vunoh HR and Payroll Password Reset</h1>
-      <p>Click the link below to reset your password:</p>
-      <a href="${process.env.BACKEND_URL}/reset-password/${mail.resetToken}">Reset Password</a>
-      `,
+    // html: `<h1>Vunoh HR and Payroll Password Reset</h1>
+    //   <p>Click the link below to reset your password:</p>
+    //   <a href="${process.env.BACKEND_URL}/reset-password/${mail.resetToken}">Reset Password</a>
+    //   `,
+    html: mail.html,
   });
 
   if (info.accepted.length === 0) {
