@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/base.css" />
+    <link rel="stylesheet" href="../../css/components.css" />
+  </head>
+  <body>
+    <main
+      style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      "
+    >
+      <div class="card" style="width: 380px" id="register-card">
+        <h2 class="card-title">Create an account</h2>
+
+        <form id="register-form">
+          <div class="input-group" style="margin-bottom: var(--space-4)">
+            <label class="input-label" for="name">Full name</label>
+            <input
+              class="input-field"
+              id="name"
+              type="text"
+              autocomplete="name"
+              required
+            />
+          </div>
+
+          <div class="input-group" style="margin-bottom: var(--space-4)">
+            <label class="input-label" for="email">Email</label>
+            <input
+              class="input-field"
+              id="email"
+              type="email"
+              autocomplete="email"
+              required
+            />
+          </div>
+
+          <div class="input-group" style="margin-bottom: var(--space-4)">
+            <label class="input-label" for="password">Password</label>
+            <input
+              class="input-field"
+              id="password"
+              type="password"
+              autocomplete="new-password"
+              required
+            />
+          </div>
+
+          <div class="input-group" style="margin-bottom: var(--space-4)">
+            <label class="input-label" for="confirm-password"
+              >Confirm password</label
+            >
+            <input
+              class="input-field"
+              id="confirm-password"
+              type="password"
+              autocomplete="new-password"
+              required
+            />
+          </div>
+
+          <p
+            id="register-error"
+            class="input-error-message"
+            style="display: none; margin-bottom: var(--space-4)"
+          ></p>
+
+          <button
+            class="btn btn-primary"
+            type="submit"
+            id="register-submit"
+            style="width: 100%"
+          >
+            Register
+          </button>
+        </form>
+
+        <p style="margin-top: var(--space-5); font-size: var(--text-sm)">
+          Already have an account? <a href="/html/public/login.html">Log in</a>
+        </p>
+      </div>
+    </main>
+
+    <script src="/js/api.js"></script>
+    <script>
+      const form = document.getElementById("register-form");
+      const errorEl = document.getElementById("register-error");
+      const submitBtn = document.getElementById("register-submit");
+      const card = document.getElementById("register-card");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorEl.style.display = "none";
+
+        const password = document.getElementById("password").value;
+        const confirmPassword =
+          document.getElementById("confirm-password").value;
+
+        if (password !== confirmPassword) {
+          errorEl.textContent = "Passwords do not match.";
+          errorEl.style.display = "block";
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Registering…";
+
+        try {
+          const name = document.getElementById("name").value.trim();
+          const email = document.getElementById("email").value.trim();
+
+          // Account is created with status "pending" and no role/employee
+          // record yet — do not auto-login (FRONTEND_SCREENS.md §3.0).
+          await apiPost("/users", { name, email, password });
+
+          card.innerHTML = `
+            <h2 class="card-title">Registration submitted</h2>
+            <p>Your account has been created and is pending approval. An administrator will review and activate it before you can log in.</p>
+            <p style="margin-top: var(--space-5); font-size: var(--text-sm);">
+              <a href="/html/public/login.html">Back to log in</a>
+            </p>
+          `;
+        } catch (err) {
+          errorEl.textContent =
+            err.message || "Registration failed. Please try again.";
+          errorEl.style.display = "block";
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Register";
+        }
+      });
+    </script>
+  </body>
+</html>

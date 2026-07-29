@@ -7,15 +7,54 @@
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/base.css" />
     <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: var(--space-6);
+      }
+      .panel-footer {
+        margin-top: var(--space-4);
+      }
+      .panel-meta {
+        font-size: var(--text-sm);
+        color: var(--color-grey-700);
+        margin-bottom: var(--space-4);
+      }
+      .panel-period-picker {
+        display: flex;
+        gap: var(--space-3);
+        margin-bottom: var(--space-4);
+      }
+    </style>
   </head>
   <body>
-    <!-- Placeholder screen — real Dashboard (frontend/FRONTEND_SCREENS.md §3.1) is a separate task. -->
     <div style="display: flex;">
       <div id="sidebar-slot"></div>
       <div style="flex: 1;">
         <div id="topbar-slot"></div>
         <main style="padding: var(--space-8);">
-          <div class="card">Dashboard not yet built.</div>
+          <div class="dashboard-grid">
+            <section class="card" id="panel-pending">
+              <h3 class="card-title">Pending Leave Requests</h3>
+              <p>Loading…</p>
+            </section>
+
+            <section class="card" id="panel-balances">
+              <h3 class="card-title">My Leave Balances</h3>
+              <p>Loading…</p>
+            </section>
+
+            <section class="card" id="panel-whosout">
+              <h3 class="card-title">Who's Out</h3>
+              <p>Loading…</p>
+            </section>
+
+            <section class="card" id="panel-payslip">
+              <h3 class="card-title">Payslip for a Period</h3>
+              <p>Loading…</p>
+            </section>
+          </div>
         </main>
       </div>
     </div>
@@ -25,7 +64,12 @@
     <script src="/js/components.js"></script>
     <script>
       requireAuth();
-      document.getElementById("sidebar-slot").innerHTML = renderSidebar(getRoleNames(), "dashboard");
+
+      const roles = getRoleNames();
+      const isPrivileged = roles.includes("hr_admin") || roles.includes("super_admin");
+      const isManager = roles.includes("manager");
+
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "dashboard");
       document.getElementById("topbar-slot").innerHTML = renderTopbar("Dashboard");
       document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
         e.preventDefault();
@@ -36,6 +80,218 @@
           window.location.href = "/html/public/login.html";
         }
       });
+
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+
+      // ---- Leave type name lookup (shared by the balances panel) ----
+      // GET /v1/leave-types is reference data any authenticated role can read;
+      // used only to resolve leave_type_id -> a human-readable name for display.
+      const leaveTypeNamesPromise = apiGet("/leave-types")
+        .then((res) => {
+          const types = res?.data?.response?.leaveTypes || res?.data?.response || [];
+          const map = {};
+          types.forEach((t) => { map[t.id] = t.name || t.code; });
+          return map;
+        })
+        .catch(() => ({}));
+
+      // ---- Panel: Pending Leave Requests ----
+      (async function renderPendingPanel() {
+        const el = document.getElementById("panel-pending");
+        try {
+          const res = await apiGet("/leave-requests?status=pending");
+          const rows = res?.data?.response?.leaveRequests || [];
+
+          const viewAllHref = isPrivileged
+            ? "/html/app/all-leave-requests.html"
+            : isManager
+              ? "/html/app/team-leave-approvals.html"
+              : "/html/app/my-leave-requests.html";
+
+          if (rows.length === 0) {
+            el.innerHTML = `
+              <h3 class="card-title">Pending Leave Requests</h3>
+              <p class="panel-meta">No pending requests.</p>
+            `;
+            return;
+          }
+
+          const table = renderTable(
+            ["Dates", "Days", "Status"],
+            rows.slice(0, 5).map((r) => [
+              `${escapeHtml(r.start_date)} – ${escapeHtml(r.end_date)}`,
+              escapeHtml(r.working_days_count),
+              renderBadge(r.status),
+            ]),
+          );
+
+          el.innerHTML = `
+            <h3 class="card-title">Pending Leave Requests</h3>
+            <p class="panel-meta">${rows.length} pending</p>
+            ${table}
+            <div class="panel-footer"><a href="${viewAllHref}">View all &rarr;</a></div>
+          `;
+        } catch (err) {
+          el.innerHTML = `
+            <h3 class="card-title">Pending Leave Requests</h3>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load pending leave requests.")}</p>
+          `;
+        }
+      })();
+
+      // ---- Panel: My Leave Balances ----
+      (async function renderBalancesPanel() {
+        const el = document.getElementById("panel-balances");
+        try {
+          const [res, leaveTypeNames] = await Promise.all([
+            apiGet(`/leave-balances?year=${now.getFullYear()}`),
+            leaveTypeNamesPromise,
+          ]);
+          const rows = res?.data?.response?.leaveBalances || [];
+
+          if (rows.length === 0) {
+            el.innerHTML = `
+              <h3 class="card-title">My Leave Balances</h3>
+              <p class="panel-meta">No balance allocated yet for ${now.getFullYear()}.</p>
+            `;
+            return;
+          }
+
+          const table = renderTable(
+            ["Leave Type", "Allocated", "Used", "Remaining"],
+            rows.map((r) => [
+              escapeHtml(leaveTypeNames[r.leave_type_id] || r.leave_type_id),
+              escapeHtml(r.allocated),
+              escapeHtml(r.used),
+              escapeHtml(r.remaining),
+            ]),
+          );
+
+          el.innerHTML = `
+            <h3 class="card-title">My Leave Balances</h3>
+            ${table}
+            <div class="panel-footer"><a href="/html/app/my-leave-balances.html">View all &rarr;</a></div>
+          `;
+        } catch (err) {
+          el.innerHTML = `
+            <h3 class="card-title">My Leave Balances</h3>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load leave balances.")}</p>
+          `;
+        }
+      })();
+
+      // ---- Panel: Who's Out (manager/HR/super_admin) or My Upcoming Leave (employee) ----
+      (async function renderWhosOutPanel() {
+        const el = document.getElementById("panel-whosout");
+        const title = isPrivileged || isManager ? "Who's Out" : "My Upcoming Leave";
+
+        try {
+          // No server-side date-range filter exists on this endpoint — the
+          // (already role-scoped) approved requests are filtered client-side.
+          const res = await apiGet("/leave-requests?status=approved");
+          const rows = res?.data?.response?.leaveRequests || [];
+
+          const filtered = (isPrivileged || isManager)
+            ? rows.filter((r) => r.start_date <= todayIso && r.end_date >= todayIso)
+            : rows.filter((r) => r.end_date >= todayIso);
+
+          if (filtered.length === 0) {
+            el.innerHTML = `
+              <h3 class="card-title">${title}</h3>
+              <p class="panel-meta">${(isPrivileged || isManager) ? "No one out today." : "No upcoming leave."}</p>
+            `;
+            return;
+          }
+
+          const table = renderTable(
+            ["Dates", "Days", "Status"],
+            filtered.slice(0, 5).map((r) => [
+              `${escapeHtml(r.start_date)} – ${escapeHtml(r.end_date)}`,
+              escapeHtml(r.working_days_count),
+              renderBadge(r.status),
+            ]),
+          );
+
+          el.innerHTML = `
+            <h3 class="card-title">${title}</h3>
+            ${table}
+          `;
+        } catch (err) {
+          el.innerHTML = `
+            <h3 class="card-title">${title}</h3>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load leave data.")}</p>
+          `;
+        }
+      })();
+
+      // ---- Panel: Payslip for a Period ----
+      function renderPayslipPanel() {
+        const el = document.getElementById("panel-payslip");
+        const month = Number(document.getElementById("payslip-month")?.value) || now.getMonth() + 1;
+        const year = Number(document.getElementById("payslip-year")?.value) || now.getFullYear();
+
+        const picker = `
+          <div class="panel-period-picker">
+            <select class="input-field" id="payslip-month">
+              ${Array.from({ length: 12 }, (_, i) => i + 1)
+                .map((m) => `<option value="${m}" ${m === month ? "selected" : ""}>${String(m).padStart(2, "0")}</option>`)
+                .join("")}
+            </select>
+            <input class="input-field" id="payslip-year" type="number" min="2000" max="2100" value="${year}" />
+          </div>
+        `;
+
+        el.innerHTML = `
+          <h3 class="card-title">Payslip for a Period</h3>
+          ${picker}
+          <p>Loading…</p>
+        `;
+
+        document.getElementById("payslip-month").addEventListener("change", renderPayslipPanel);
+        document.getElementById("payslip-year").addEventListener("change", renderPayslipPanel);
+
+        apiGet(`/payslips?periodMonth=${month}&periodYear=${year}`)
+          .then((res) => {
+            const rows = res?.data?.response?.payslips || [];
+            const payslip = rows[0];
+
+            if (!payslip) {
+              el.innerHTML = `
+                <h3 class="card-title">Payslip for a Period</h3>
+                ${picker}
+                <p class="panel-meta">No payslip for this period yet.</p>
+              `;
+              wirePicker();
+              return;
+            }
+
+            el.innerHTML = `
+              <h3 class="card-title">Payslip for a Period</h3>
+              ${picker}
+              <div class="panel-meta">
+                Gross: ${escapeHtml(payslip.gross_pay)} &middot; Net: ${escapeHtml(payslip.net_pay)}
+              </div>
+              <div class="panel-footer"><a href="/html/app/my-payslips.html">View all &rarr;</a></div>
+            `;
+            wirePicker();
+          })
+          .catch((err) => {
+            el.innerHTML = `
+              <h3 class="card-title">Payslip for a Period</h3>
+              ${picker}
+              <p class="input-error-message">${escapeHtml(err.message || "Failed to load payslip.")}</p>
+            `;
+            wirePicker();
+          });
+
+        function wirePicker() {
+          document.getElementById("payslip-month").addEventListener("change", renderPayslipPanel);
+          document.getElementById("payslip-year").addEventListener("change", renderPayslipPanel);
+        }
+      }
+
+      renderPayslipPanel();
     </script>
   </body>
 </html>
