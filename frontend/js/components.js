@@ -50,13 +50,13 @@ const SIDEBAR_NAV_ITEMS = [
   {
     id: "user-accounts",
     label: "User Accounts",
-    href: "/html/app/user-accounts.html",
+    href: "/html/app/admin/users.html",
     roles: ["hr_admin", "super_admin"],
   },
   {
     id: "all-employees",
     label: "All Employees",
-    href: "/html/app/all-employees.html",
+    href: "/html/app/admin/employees.html",
     roles: ["hr_admin", "super_admin"],
   },
   {
