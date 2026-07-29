@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>All Leave Requests — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .filters-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        align-items: flex-end;
+        margin-bottom: var(--space-5);
+      }
+      .filters-row .input-group {
+        min-width: 170px;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card">
+            <div class="filters-row">
+              <div class="input-group">
+                <label class="input-label" for="filter-status">Status</label>
+                <select class="input-field" id="filter-status">
+                  <option value="">Any</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="filter-employee">Employee</label>
+                <select class="input-field" id="filter-employee">
+                  <option value="">Any</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="filter-start">From</label>
+                <input class="input-field" id="filter-start" type="date" />
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="filter-end">To</label>
+                <input class="input-field" id="filter-end" type="date" />
+              </div>
+              <button class="btn btn-secondary" id="clear-filters-btn">Clear</button>
+            </div>
+            <div id="requests-list"><p>Loading…</p></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "all-leave-requests");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("All Leave Requests");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const listEl = document.getElementById("requests-list");
+      const statusSelect = document.getElementById("filter-status");
+      const employeeSelect = document.getElementById("filter-employee");
+      const startInput = document.getElementById("filter-start");
+      const endInput = document.getElementById("filter-end");
+
+      const leaveTypeNamesPromise = apiGet("/leave-types")
+        .then((res) => {
+          const types = res?.data?.response?.leaveTypes || [];
+          const map = {};
+          types.forEach((t) => { map[t.id] = t.name || t.code; });
+          return map;
+        })
+        .catch(() => ({}));
+
+      async function loadEmployeePicker() {
+        try {
+          const res = await apiGet("/employees");
+          const employees = res?.data?.response?.employees || [];
+          employeeSelect.innerHTML =
+            `<option value="">Any</option>` +
+            employees
+              .map((e) => `<option value="${e.id}">${escapeHtml(e.name || e.job_title)} (${String(e.user_id).slice(0, 8)})</option>`)
+              .join("");
+        } catch {
+          // employee picker is a filter convenience — leave it at "Any" on failure
+        }
+      }
+
+      async function loadRequests() {
+        listEl.innerHTML = "<p>Loading…</p>";
+
+        const params = new URLSearchParams();
+        if (statusSelect.value) params.set("status", statusSelect.value);
+        if (employeeSelect.value) params.set("employeeId", employeeSelect.value);
+        const query = params.toString() ? `?${params.toString()}` : "";
+
+        try {
+          const [res, leaveTypeNames] = await Promise.all([
+            apiGet(`/leave-requests${query}`),
+            leaveTypeNamesPromise,
+          ]);
+          let rows = res?.data?.response?.leaveRequests || [];
+
+          // No server-side date-range filter exists on this endpoint — the
+          // From/To pickers filter the already-scoped/filtered rows client-side.
+          if (startInput.value) rows = rows.filter((r) => r.end_date >= startInput.value);
+          if (endInput.value) rows = rows.filter((r) => r.start_date <= endInput.value);
+
+          if (rows.length === 0) {
+            listEl.innerHTML = "<p>No leave requests match these filters.</p>";
+            return;
+          }
+
+          const table = renderTable(
+            ["Leave Type", "Dates", "Working Days", "Status"],
+            rows.map((r) => [
+              escapeHtml(leaveTypeNames[r.leave_type_id] || r.leave_type_id),
+              `${escapeHtml(r.start_date)} – ${escapeHtml(r.end_date)}`,
+              escapeHtml(r.working_days_count),
+              renderBadge(r.status),
+            ]),
+          );
+
+          listEl.innerHTML = table;
+
+          listEl.querySelectorAll(".table-row").forEach((row, i) => {
+            row.addEventListener("click", () => {
+              window.location.href = `/html/app/employee/leave-request-detail.html?id=${rows[i].id}`;
+            });
+          });
+        } catch (err) {
+          listEl.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load leave requests.")}</p>`;
+        }
+      }
+
+      [statusSelect, employeeSelect, startInput, endInput].forEach((el) => el.addEventListener("change", loadRequests));
+
+      document.getElementById("clear-filters-btn").addEventListener("click", () => {
+        statusSelect.value = "";
+        employeeSelect.value = "";
+        startInput.value = "";
+        endInput.value = "";
+        loadRequests();
+      });
+
+      loadEmployeePicker().then(loadRequests);
+    </script>
+  </body>
+</html>
