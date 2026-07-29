@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>Employee Detail — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <style>
+      .detail-field {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-4);
+        padding: var(--space-3) 0;
+        border-bottom: var(--border-width) solid var(--color-border);
+      }
+      .detail-field-label {
+        font-size: var(--text-sm);
+        color: var(--color-grey-700);
+      }
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-card {
+        max-width: 420px;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 620px;" id="detail-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <div id="modal-slot"></div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "all-employees");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Employee Detail");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("detail-panel");
+      const modalSlot = document.getElementById("modal-slot");
+      const employeeId = new URLSearchParams(window.location.search).get("id");
+
+      function fieldRow(label, value) {
+        return `
+          <div class="detail-field">
+            <span class="detail-field-label">${escapeHtml(label)}</span>
+            <span>${value}</span>
+          </div>
+        `;
+      }
+
+      async function loadEmployee() {
+        if (!employeeId) {
+          panel.innerHTML = `<h2 class="card-title">Employee Detail</h2><p>Missing employee id.</p>`;
+          return;
+        }
+
+        try {
+          const res = await apiGet(`/employees/${employeeId}`);
+          const employee = res?.data?.response?.employee;
+
+          if (!employee) {
+            panel.innerHTML = `<h2 class="card-title">Employee Detail</h2><p>Employee not found.</p>`;
+            return;
+          }
+
+          let teamName = employee.team_id;
+          try {
+            const teamRes = await apiGet(`/teams/${employee.team_id}`);
+            teamName = teamRes?.data?.response?.team?.name || employee.team_id;
+          } catch {
+            // fall back to the raw team id
+          }
+
+          renderEmployee(employee, teamName);
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">Employee Detail</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load this employee.")}</p>
+          `;
+        }
+      }
+
+      function renderEmployee(employee, teamName) {
+        // This is the privileged view — super_admin/hr_admin get every field
+        // back from the API unsanitized, including salary/resume/national ID.
+        panel.innerHTML = `
+          <h2 class="card-title">Employee Detail</h2>
+          ${fieldRow("Job title", escapeHtml(employee.job_title))}
+          ${fieldRow("Team", escapeHtml(teamName))}
+          ${fieldRow("Manager ID", employee.manager_id ? escapeHtml(employee.manager_id) : "—")}
+          ${fieldRow("Start date", escapeHtml(employee.start_date))}
+          ${fieldRow("Salary", escapeHtml(employee.salary))}
+          ${fieldRow("Employment type", escapeHtml(employee.employment_type))}
+          ${fieldRow("Resume", employee.resume ? escapeHtml(employee.resume) : "—")}
+          ${fieldRow("Phone", employee.phone ? escapeHtml(employee.phone) : "—")}
+          ${fieldRow("Profile picture", employee.profile_picture ? escapeHtml(employee.profile_picture) : "—")}
+          ${fieldRow("National ID", employee.national_id ? escapeHtml(employee.national_id) : "—")}
+          ${fieldRow("Active", employee.is_active ? "Yes" : "No")}
+
+          <p id="action-error" class="input-error-message" style="display: none; margin-top: var(--space-4);"></p>
+
+          <div style="display: flex; gap: var(--space-3); margin-top: var(--space-5); flex-wrap: wrap;">
+            <a class="btn btn-secondary" href="html/app/admin/edit-employee.html?id=${employee.id}">Edit</a>
+            ${
+              employee.is_active
+                ? `<button class="btn btn-secondary" id="deactivate-btn">Deactivate</button>`
+                : `<button class="btn btn-secondary" id="activate-btn">Activate</button>`
+            }
+            <button class="btn btn-danger" id="delete-btn">Delete (soft-delete)</button>
+          </div>
+        `;
+
+        const actionError = document.getElementById("action-error");
+        const activateBtn = document.getElementById("activate-btn");
+        const deactivateBtn = document.getElementById("deactivate-btn");
+        const deleteBtn = document.getElementById("delete-btn");
+
+        async function toggleActive(btn, endpoint) {
+          btn.disabled = true;
+          actionError.style.display = "none";
+          try {
+            await apiPost(`/employees/${employee.id}/${endpoint}`, undefined);
+            loadEmployee();
+          } catch (err) {
+            actionError.textContent = err.message || `Failed to ${endpoint} this employee.`;
+            actionError.style.display = "block";
+            btn.disabled = false;
+          }
+        }
+
+        if (activateBtn) activateBtn.addEventListener("click", () => toggleActive(activateBtn, "activate"));
+        if (deactivateBtn) deactivateBtn.addEventListener("click", () => toggleActive(deactivateBtn, "deactivate"));
+
+        deleteBtn.addEventListener("click", () => openDeleteModal(employee.id));
+      }
+
+      function openDeleteModal(id) {
+        modalSlot.innerHTML = `
+          <div class="modal-backdrop">
+            <div class="card modal-card">
+              <h3 class="card-title">Delete this employee?</h3>
+              <p>
+                This sets the employee record as deleted (soft-delete) — it will no longer appear in any
+                list or detail view, and payroll runs will exclude them going forward. There is no
+                "undelete" endpoint; this cannot be reversed from the UI.
+              </p>
+              <p id="delete-error" class="input-error-message" style="display: none; margin-top: var(--space-4);"></p>
+              <div style="display: flex; gap: var(--space-3); margin-top: var(--space-5);">
+                <button class="btn btn-danger" id="confirm-delete-btn">Delete permanently</button>
+                <button class="btn btn-secondary" id="cancel-delete-btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        document.getElementById("cancel-delete-btn").addEventListener("click", () => {
+          modalSlot.innerHTML = "";
+        });
+
+        document.getElementById("confirm-delete-btn").addEventListener("click", async () => {
+          const confirmBtn = document.getElementById("confirm-delete-btn");
+          const deleteError = document.getElementById("delete-error");
+          confirmBtn.disabled = true;
+          deleteError.style.display = "none";
+
+          try {
+            await apiDelete(`/employees/${id}`, undefined);
+            window.location.href = "html/app/admin/employees.html";
+          } catch (err) {
+            deleteError.textContent = err.message || "Failed to delete this employee.";
+            deleteError.style.display = "block";
+            confirmBtn.disabled = false;
+          }
+        });
+      }
+
+      loadEmployee();
+    </script>
+  </body>
+</html>

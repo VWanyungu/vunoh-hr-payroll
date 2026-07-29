@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>Edit Employee — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <style>
+      .field-with-upload {
+        display: flex;
+        gap: var(--space-3);
+        align-items: flex-start;
+      }
+      .field-with-upload .input-field {
+        flex: 1;
+      }
+      .upload-coming-soon {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-1);
+      }
+      .upload-coming-soon small {
+        white-space: nowrap;
+      }
+      .form-row {
+        display: flex;
+        gap: var(--space-4);
+      }
+      .form-row .input-group {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 600px;" id="form-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script>
+      requireRole(["super_admin", "hr_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "all-employees");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Edit Employee");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("form-panel");
+      const employeeId = new URLSearchParams(window.location.search).get("id");
+
+      async function loadFormData() {
+        if (!employeeId) {
+          panel.innerHTML = `<h2 class="card-title">Edit Employee</h2><p>Missing employee id.</p>`;
+          return;
+        }
+
+        try {
+          const [employeeRes, teamsRes, employeesRes] = await Promise.all([
+            apiGet(`/employees/${employeeId}`),
+            apiGet("/teams"),
+            apiGet("/employees"),
+          ]);
+
+          const employee = employeeRes?.data?.response?.employee;
+          const teams = teamsRes?.data?.response?.teams || [];
+          const employees = (employeesRes?.data?.response?.employees || []).filter((e) => e.id !== employeeId);
+
+          if (!employee) {
+            panel.innerHTML = `<h2 class="card-title">Edit Employee</h2><p>Employee not found.</p>`;
+            return;
+          }
+
+          renderForm(employee, teams, employees);
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">Edit Employee</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load this employee.")}</p>
+          `;
+        }
+      }
+
+      function renderForm(employee, teams, employees) {
+        panel.innerHTML = `
+          <h2 class="card-title">Edit Employee</h2>
+          <form id="edit-form">
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="jobTitle">Job title</label>
+              <input class="input-field" id="jobTitle" type="text" value="${escapeHtml(employee.job_title)}" required />
+            </div>
+
+            <div class="form-row" style="margin-bottom: var(--space-4);">
+              <div class="input-group">
+                <label class="input-label" for="teamId">Team</label>
+                <select class="input-field" id="teamId" required>
+                  ${teams.map((t) => `<option value="${t.id}" ${t.id === employee.team_id ? "selected" : ""}>${escapeHtml(t.name)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="managerId">Manager</label>
+                <select class="input-field" id="managerId">
+                  <option value="" ${!employee.manager_id ? "selected" : ""}>None</option>
+                  ${employees
+                    .map((e) => `<option value="${e.id}" ${e.id === employee.manager_id ? "selected" : ""}>${escapeHtml(e.job_title)} (${String(e.user_id).slice(0, 8)})</option>`)
+                    .join("")}
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-bottom: var(--space-4);">
+              <div class="input-group">
+                <label class="input-label" for="startDate">Start date</label>
+                <input class="input-field" id="startDate" type="date" value="${escapeHtml(employee.start_date)}" required />
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="salary">Salary</label>
+                <input class="input-field" id="salary" type="number" step="0.01" min="0" value="${escapeHtml(employee.salary)}" required />
+              </div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="employmentType">Employment type</label>
+              <select class="input-field" id="employmentType" required>
+                <option value="full_time" ${employee.employment_type === "full_time" ? "selected" : ""}>Full time</option>
+                <option value="contract" ${employee.employment_type === "contract" ? "selected" : ""}>Contract</option>
+              </select>
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="phone">Phone</label>
+              <input class="input-field" id="phone" type="text" value="${escapeHtml(employee.phone || "")}" />
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="resume">Resume (URL)</label>
+              <div class="field-with-upload">
+                <input class="input-field" id="resume" type="text" value="${escapeHtml(employee.resume || "")}" />
+                <div class="upload-coming-soon">
+                  <input type="file" class="input-field" disabled />
+                  <small>Coming soon</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="profilePicture">Profile picture (URL)</label>
+              <div class="field-with-upload">
+                <input class="input-field" id="profilePicture" type="text" value="${escapeHtml(employee.profile_picture || "")}" />
+                <div class="upload-coming-soon">
+                  <input type="file" class="input-field" disabled />
+                  <small>Coming soon</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="nationalId">National ID</label>
+              <input class="input-field" id="nationalId" type="number" value="${escapeHtml(employee.national_id || "")}" />
+            </div>
+
+            <p id="edit-error" class="input-error-message" style="display: none; margin-bottom: var(--space-4);"></p>
+            <p id="edit-success" style="display: none; color: var(--color-success); margin-bottom: var(--space-4);"></p>
+
+            <div style="display: flex; gap: var(--space-3);">
+              <button class="btn btn-primary" type="submit" id="edit-submit">Save changes</button>
+              <a class="btn btn-secondary" href="html/app/admin/employee-detail.html?id=${employee.id}">Cancel</a>
+            </div>
+          </form>
+        `;
+
+        document.getElementById("edit-form").addEventListener("submit", (e) => handleSubmit(e, employee.id));
+      }
+
+      async function handleSubmit(e, id) {
+        e.preventDefault();
+        const errorEl = document.getElementById("edit-error");
+        const successEl = document.getElementById("edit-success");
+        const submitBtn = document.getElementById("edit-submit");
+        errorEl.style.display = "none";
+        successEl.style.display = "none";
+
+        const managerId = document.getElementById("managerId").value;
+        const phone = document.getElementById("phone").value.trim();
+        const resume = document.getElementById("resume").value.trim();
+        const profilePicture = document.getElementById("profilePicture").value.trim();
+        const nationalId = document.getElementById("nationalId").value;
+
+        // Unlike the self-service Edit My Profile form, the wider
+        // updateEmployeeSchema lets a privileged caller edit every field.
+        const payload = {
+          jobTitle: document.getElementById("jobTitle").value.trim(),
+          teamId: document.getElementById("teamId").value,
+          startDate: document.getElementById("startDate").value,
+          salary: Number(document.getElementById("salary").value),
+          employmentType: document.getElementById("employmentType").value,
+          phone,
+          resume,
+          profilePicture,
+        };
+        // managerId's schema (uuidSchema.optional()) has no `.allow(null)` —
+        // there's no documented way to clear an existing manager back to
+        // "None" via this endpoint, so we only send it when a value is set.
+        if (managerId) payload.managerId = managerId;
+        if (nationalId) payload.nationalId = Number(nationalId);
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Saving…";
+
+        try {
+          await apiPut(`/employees/${id}`, payload);
+          successEl.textContent = "Employee updated.";
+          successEl.style.display = "block";
+          setTimeout(() => {
+            window.location.href = `html/app/admin/employee-detail.html?id=${id}`;
+          }, 600);
+        } catch (err) {
+          errorEl.textContent = err.message || "Failed to update this employee.";
+          errorEl.style.display = "block";
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Save changes";
+        }
+      }
+
+      loadFormData();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>User Accounts — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <style>
+      .status-pills {
+        display: flex;
+        gap: var(--space-2);
+        margin-bottom: var(--space-5);
+      }
+      .status-pill {
+        font-size: var(--text-sm);
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card">
+            <div class="status-pills" id="status-pills">
+              <button class="btn btn-secondary status-pill active" data-status="">All</button>
+              <button class="btn btn-secondary status-pill" data-status="pending">Pending</button>
+              <button class="btn btn-secondary status-pill" data-status="approved">Approved</button>
+              <button class="btn btn-secondary status-pill" data-status="rejected">Rejected</button>
+            </div>
+            <div id="users-list"><p>Loading…</p></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "user-accounts");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("User Accounts");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "html/public/login.html";
+        }
+      });
+
+      const listEl = document.getElementById("users-list");
+
+      async function loadUsers(status) {
+        listEl.innerHTML = "<p>Loading…</p>";
+        try {
+          const params = new URLSearchParams({ type: "multiple", limit: "100" });
+          if (status) params.set("status", status);
+
+          const res = await apiGet(`/users?${params.toString()}`);
+          const users = res?.data?.response?.users || [];
+
+          if (users.length === 0) {
+            listEl.innerHTML = "<p>No users found.</p>";
+            return;
+          }
+
+          const table = renderTable(
+            ["Name", "Email", "Status", "Roles"],
+            users.map((u) => [
+              escapeHtml(u.name),
+              escapeHtml(u.email),
+              renderBadge(u.status),
+              escapeHtml((u.roles || []).map((r) => r.role).join(", ") || "—"),
+            ]),
+          );
+
+          listEl.innerHTML = table;
+
+          listEl.querySelectorAll(".table-row").forEach((row, i) => {
+            row.addEventListener("click", () => {
+              window.location.href = `html/app/admin/user-detail.html?id=${users[i].id}`;
+            });
+          });
+        } catch (err) {
+          listEl.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load users.")}</p>`;
+        }
+      }
+
+      document.getElementById("status-pills").addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-status]");
+        if (!btn) return;
+
+        document.querySelectorAll(".status-pill").forEach((el) => el.classList.remove("active"));
+        btn.classList.add("active");
+        loadUsers(btn.dataset.status);
+      });
+
+      loadUsers("");
+    </script>
+  </body>
+</html>

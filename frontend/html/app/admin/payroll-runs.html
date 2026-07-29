@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname)
+          ? "/frontend/"
+          : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>Payroll Runs — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <style>
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-card {
+        max-width: 440px;
+      }
+      .period-row {
+        display: flex;
+        gap: var(--space-4);
+        margin-bottom: var(--space-5);
+      }
+      .period-row .input-group {
+        max-width: 160px;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8)">
+          <div
+            class="card"
+            style="max-width: 640px; margin-bottom: var(--space-6)"
+          >
+            <h2 class="card-title">Run Payroll</h2>
+            <form id="payroll-form">
+              <div class="period-row">
+                <div class="input-group">
+                  <label class="input-label" for="period-month">Month</label>
+                  <select class="input-field" id="period-month"></select>
+                </div>
+                <div class="input-group">
+                  <label class="input-label" for="period-year">Year</label>
+                  <input
+                    class="input-field"
+                    id="period-year"
+                    type="number"
+                    min="2000"
+                    max="2100"
+                  />
+                </div>
+              </div>
+              <button class="btn btn-primary" type="submit">Run payroll</button>
+            </form>
+          </div>
+
+          <div class="card" style="max-width: 800px" id="results-panel"></div>
+        </main>
+      </div>
+    </div>
+
+    <div id="modal-slot"></div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(
+        roles,
+        "payroll-runs",
+      );
+      document.getElementById("topbar-slot").innerHTML =
+        renderTopbar("Payroll Runs");
+      document
+        .querySelector('[data-action="logout"]')
+        .addEventListener("click", async (e) => {
+          e.preventDefault();
+          try {
+            await apiPost("/logout", {
+              token: getAccessToken(),
+              refreshToken: getRefreshToken(),
+            });
+          } finally {
+            clearTokens();
+            window.location.href = "html/public/login.html";
+          }
+        });
+
+      const now = new Date();
+      const monthSelect = document.getElementById("period-month");
+      const yearInput = document.getElementById("period-year");
+      monthSelect.innerHTML = Array.from({ length: 12 }, (_, i) => i + 1)
+        .map(
+          (m) =>
+            `<option value="${m}" ${m === now.getMonth() + 1 ? "selected" : ""}>${String(m).padStart(2, "0")}</option>`,
+        )
+        .join("");
+      yearInput.value = now.getFullYear();
+
+      const modalSlot = document.getElementById("modal-slot");
+      const resultsPanel = document.getElementById("results-panel");
+
+      document
+        .getElementById("payroll-form")
+        .addEventListener("submit", (e) => {
+          e.preventDefault();
+          openConfirmModal(Number(monthSelect.value), Number(yearInput.value));
+        });
+
+      function openConfirmModal(month, year) {
+        modalSlot.innerHTML = `
+          <div class="modal-backdrop">
+            <div class="card modal-card">
+              <h3 class="card-title">Run payroll for ${String(month).padStart(2, "0")}/${year}?</h3>
+              <p>
+                This generates a payslip for every active employee for this period. If payslips already
+                exist for this period, re-running does not fail or overwrite them — it creates a new
+                payslip version for each employee instead. This is expected behavior.
+              </p>
+              <p id="run-error" class="input-error-message" style="display: none; margin-top: var(--space-4);"></p>
+              <div style="display: flex; gap: var(--space-3); margin-top: var(--space-5);">
+                <button class="btn btn-primary" id="confirm-run-btn">Run payroll</button>
+                <button class="btn btn-secondary" id="cancel-run-btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        document
+          .getElementById("cancel-run-btn")
+          .addEventListener("click", () => {
+            modalSlot.innerHTML = "";
+          });
+
+        document
+          .getElementById("confirm-run-btn")
+          .addEventListener("click", async () => {
+            const confirmBtn = document.getElementById("confirm-run-btn");
+            const errorEl = document.getElementById("run-error");
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = "Running…";
+            errorEl.style.display = "none";
+
+            try {
+              const res = await apiPost("/payroll-runs", {
+                periodMonth: month,
+                periodYear: year,
+              });
+              const payslips = res?.data?.response?.payslips || [];
+              const errors = res?.data?.response?.errors || [];
+              modalSlot.innerHTML = "";
+              renderResults(month, year, payslips, errors);
+            } catch (err) {
+              errorEl.textContent = err.message || "Failed to run payroll.";
+              errorEl.style.display = "block";
+              confirmBtn.disabled = false;
+              confirmBtn.textContent = "Run payroll";
+            }
+          });
+      }
+
+      function renderResults(month, year, payslips, errors) {
+        const periodQuery = `periodMonth=${month}&periodYear=${year}`;
+
+        const successTable =
+          payslips.length > 0
+            ? renderTable(
+                ["Employee ID", "Gross", "Net", "Version"],
+                payslips.map((p) => [
+                  escapeHtml(p.employee_id),
+                  escapeHtml(p.gross_pay),
+                  escapeHtml(p.net_pay),
+                  escapeHtml(p.version),
+                ]),
+              )
+            : "<p>No payslips were generated.</p>";
+
+        const errorTable =
+          errors.length > 0
+            ? renderTable(
+                ["Employee ID", "Error"],
+                errors.map((e) => [
+                  escapeHtml(e.employeeId),
+                  escapeHtml(
+                    (e.error && e.error.message) ||
+                      String(e.error.detail) ||
+                      "Failed to generate payslip",
+                  ),
+                ]),
+              )
+            : "";
+
+        resultsPanel.innerHTML = `
+          <h2 class="card-title">Run results — ${String(month).padStart(2, "0")}/${year}</h2>
+          <p>${payslips.length} payslip(s) generated${errors.length > 0 ? `, ${errors.length} error(s)` : ""}.</p>
+          ${successTable}
+          ${errors.length > 0 ? `<h3 class="card-title" style="margin-top: var(--space-6);">Errors</h3>${errorTable}` : ""}
+          <div style="margin-top: var(--space-5);">
+            <a class="btn btn-secondary" href="html/app/admin/all-payslips.html?${periodQuery}">View in All Payslips &rarr;</a>
+          </div>
+        `;
+      }
+    </script>
+  </body>
+</html>
