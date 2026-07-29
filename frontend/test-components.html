@@ -3,6 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
     <title>Component Test Page</title>
     <link rel="stylesheet" href="./css/tokens.css" />
     <link rel="stylesheet" href="./css/base.css" />
@@ -121,7 +129,7 @@
       </div>
     </section>
 
-    <script src="/js/components.js"></script>
+    <script src="js/components.js"></script>
     <script>
       document.getElementById("table-slot").innerHTML = renderTable(
         ["Employee", "Team", "Status"],

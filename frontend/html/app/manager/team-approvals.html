@@ -3,10 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
     <title>Team Leave Approvals — Vunoh HR Payroll</title>
-    <link rel="stylesheet" href="/css/tokens.css" />
-    <link rel="stylesheet" href="/css/base.css" />
-    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
     <style>
       .status-pills {
         display: flex;
@@ -38,9 +46,9 @@
       </div>
     </div>
 
-    <script src="/js/auth.js"></script>
-    <script src="/js/api.js"></script>
-    <script src="/js/components.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
     <script>
       requireRole(["manager"]);
 
@@ -53,7 +61,7 @@
           await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
         } finally {
           clearTokens();
-          window.location.href = "/html/public/login.html";
+          window.location.href = "html/public/login.html";
         }
       });
 
@@ -100,7 +108,7 @@
 
           listEl.querySelectorAll(".table-row").forEach((row, i) => {
             row.addEventListener("click", () => {
-              window.location.href = `/html/app/employee/leave-request-detail.html?id=${rows[i].id}`;
+              window.location.href = `html/app/employee/leave-request-detail.html?id=${rows[i].id}`;
             });
           });
         } catch (err) {
