@@ -1,0 +1,64 @@
+@import url("https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Playfair+Display:ital@1&display=swap");
+
+:root {
+  /* ---- Color: Primary (Blue) ---- */
+  --color-primary-900: #10273f; /* deep navy — headings on light bg, high-emphasis text */
+  --color-primary-700: #1e4a6e; /* primary hover/active */
+  --color-primary-500: #2e6f9e; /* primary brand blue — buttons, links, active states */
+  --color-primary-300: #85b4d6; /* muted blue — icons, secondary accents */
+  --color-primary-100: #e3eef5; /* pale blue tint — active nav bg, info banners */
+
+  /* ---- Color: Neutral (Grey, warm-tinted) ---- */
+  --color-grey-900: #23272b; /* primary text */
+  --color-grey-700: #4b5359; /* secondary text */
+  --color-grey-500: #7c868d; /* muted text, placeholders */
+  --color-grey-300: #c9cfd3; /* borders, dividers */
+  --color-grey-100: #f4f5f6; /* page background */
+  --color-white: #ffffff; /* surfaces: cards, inputs, sidebar */
+
+  /* ---- Color: Semantic ---- */
+  --color-success: #3c8f63;
+  --color-success-bg: #e5f3ea;
+  --color-warning: #b4801e;
+  --color-warning-bg: #fbf1dc;
+  --color-danger: #c0453b;
+  --color-danger-bg: #fbe7e5;
+
+  /* ---- Typography ---- */
+  --font-primary: "Rubik", -apple-system, sans-serif;
+  --font-accent: "Playfair Display", serif; /* use font-style: italic */
+
+  --text-xs: 12px; /* captions, meta */
+  --text-sm: 13px; /* secondary labels */
+  --text-base: 14px; /* body, table cells */
+  --text-md: 16px; /* subheadings */
+  --text-lg: 18px; /* card/section titles */
+  --text-xl: 22px; /* page titles */
+  --text-2xl: 28px; /* dashboard greeting, rare */
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ---- Spacing (4px base unit) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ---- Radius ---- */
+  --radius-sm: 1px; /* inputs, small buttons, table rows */
+  --radius-md: 2px; /* buttons, cards, panels */
+  --radius-pill: 999px; /* badges only */
+
+  /* ---- Border (elevation substitute — flat design, no shadows) ---- */
+  --border-width: 1px;
+  --color-border: var(--color-grey-300);
+  --color-border-strong: var(--color-grey-500); /* hover/focus emphasis */
+}
