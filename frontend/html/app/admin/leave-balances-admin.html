@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>Leave Balances Admin — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <style>
+      .picker-row {
+        display: flex;
+        gap: var(--space-4);
+        margin-bottom: var(--space-5);
+        align-items: flex-end;
+      }
+      .picker-row .input-group {
+        min-width: 220px;
+      }
+      .allocate-row {
+        display: flex;
+        gap: var(--space-3);
+        align-items: flex-end;
+        margin-top: var(--space-5);
+        padding-top: var(--space-5);
+        border-top: var(--border-width) solid var(--color-border);
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card">
+            <div class="picker-row">
+              <div class="input-group">
+                <label class="input-label" for="employee-select">Employee</label>
+                <select class="input-field" id="employee-select">
+                  <option value="" disabled selected>Select an employee…</option>
+                </select>
+              </div>
+              <div class="input-group" style="min-width: 120px;">
+                <label class="input-label" for="year-input">Year</label>
+                <input class="input-field" id="year-input" type="number" min="2000" max="2100" />
+              </div>
+            </div>
+
+            <div id="balances-panel"><p>Select an employee to view their leave balances.</p></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "leave-balances-admin");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Leave Balances Admin");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "html/public/login.html";
+        }
+      });
+
+      const employeeSelect = document.getElementById("employee-select");
+      const yearInput = document.getElementById("year-input");
+      const balancesPanel = document.getElementById("balances-panel");
+      const currentYear = new Date().getFullYear();
+      yearInput.value = currentYear;
+
+      let leaveTypes = [];
+
+      async function loadPickers() {
+        try {
+          const [employeesRes, typesRes] = await Promise.all([
+            apiGet("/employees"),
+            apiGet("/leave-types"),
+          ]);
+
+          const employees = employeesRes?.data?.response?.employees || [];
+          leaveTypes = typesRes?.data?.response?.leaveTypes || [];
+
+          employeeSelect.innerHTML =
+            `<option value="" disabled selected>Select an employee…</option>` +
+            employees
+              .map((e) => `<option value="${e.id}">${escapeHtml(e.name)} — ${escapeHtml(e.job_title)}</option>`)
+              .join("");
+        } catch (err) {
+          balancesPanel.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load employees.")}</p>`;
+        }
+      }
+
+      async function loadBalances() {
+        const employeeId = employeeSelect.value;
+        const year = Number(yearInput.value) || currentYear;
+
+        if (!employeeId) {
+          balancesPanel.innerHTML = `<p>Select an employee to view their leave balances.</p>`;
+          return;
+        }
+
+        balancesPanel.innerHTML = "<p>Loading…</p>";
+
+        try {
+          const res = await apiGet(`/leave-balances?employeeId=${employeeId}&year=${year}`);
+          const balances = res?.data?.response?.leaveBalances || [];
+          const typeNames = {};
+          leaveTypes.forEach((t) => { typeNames[t.id] = t.name || t.code; });
+
+          const tableHtml = balances.length === 0
+            ? `<p>No balance allocated yet for ${year}.</p>`
+            : renderTable(
+                ["Leave Type", "Allocated", "Used", "Remaining"],
+                balances.map((b) => [
+                  escapeHtml(typeNames[b.leave_type_id] || b.leave_type_id),
+                  escapeHtml(b.allocated),
+                  escapeHtml(b.used),
+                  escapeHtml(b.remaining),
+                ]),
+              );
+
+          // No update/edit endpoint exists for leave balances (§6.2 item 1) —
+          // this is a create-only screen, so no edit action is rendered here.
+          balancesPanel.innerHTML = `
+            ${tableHtml}
+            <form id="allocate-form" class="allocate-row">
+              <div class="input-group">
+                <label class="input-label" for="allocate-type">Leave type</label>
+                <select class="input-field" id="allocate-type" required>
+                  ${leaveTypes.map((t) => `<option value="${t.id}">${escapeHtml(t.name || t.code)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="input-group" style="max-width: 140px;">
+                <label class="input-label" for="allocate-days">Allocated days</label>
+                <input class="input-field" id="allocate-days" type="number" min="0" step="1" required />
+              </div>
+              <button class="btn btn-primary" type="submit">Allocate</button>
+            </form>
+            <p id="allocate-error" class="input-error-message" style="display: none; margin-top: var(--space-3);"></p>
+          `;
+
+          document.getElementById("allocate-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const errorEl = document.getElementById("allocate-error");
+            errorEl.style.display = "none";
+
+            const payload = {
+              employeeId,
+              leaveTypeId: document.getElementById("allocate-type").value,
+              year,
+              allocated: Number(document.getElementById("allocate-days").value),
+            };
+
+            try {
+              await apiPost("/leave-balances", payload);
+              loadBalances();
+            } catch (err) {
+              errorEl.textContent = err.message || "Failed to allocate leave balance.";
+              errorEl.style.display = "block";
+            }
+          });
+        } catch (err) {
+          balancesPanel.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load leave balances.")}</p>`;
+        }
+      }
+
+      employeeSelect.addEventListener("change", loadBalances);
+      yearInput.addEventListener("change", loadBalances);
+
+      loadPickers();
+    </script>
+  </body>
+</html>

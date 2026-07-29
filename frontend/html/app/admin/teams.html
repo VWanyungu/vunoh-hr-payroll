@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>Teams — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card">
+            <div class="input-group" style="margin-bottom: var(--space-4); max-width: 320px;">
+              <input class="input-field" id="team-search" type="text" placeholder="Search teams…" />
+            </div>
+            <div id="teams-list"><p>Loading…</p></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "teams");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Teams", {
+        label: "Create Team",
+        id: "create-team-btn",
+      });
+      document.getElementById("create-team-btn").addEventListener("click", () => {
+        window.location.href = "html/app/admin/create-team.html";
+      });
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "html/public/login.html";
+        }
+      });
+
+      const listEl = document.getElementById("teams-list");
+
+      async function loadTeams(search) {
+        listEl.innerHTML = "<p>Loading…</p>";
+        try {
+          const query = search ? `?name=${encodeURIComponent(search)}` : "";
+          const res = await apiGet(`/teams${query}`);
+          const teams = res?.data?.response?.teams || [];
+
+          if (teams.length === 0) {
+            listEl.innerHTML = "<p>No teams yet.</p>";
+            return;
+          }
+
+          const table = renderTable(
+            ["Name"],
+            teams.map((t) => [escapeHtml(t.name)]),
+          );
+
+          listEl.innerHTML = table;
+
+          listEl.querySelectorAll(".table-row").forEach((row, i) => {
+            row.addEventListener("click", () => {
+              window.location.href = `html/app/admin/team-detail.html?id=${teams[i].id}`;
+            });
+          });
+        } catch (err) {
+          listEl.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load teams.")}</p>`;
+        }
+      }
+
+      let searchTimeout;
+      document.getElementById("team-search").addEventListener("input", (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => loadTeams(e.target.value.trim()), 300);
+      });
+
+      loadTeams();
+    </script>
+  </body>
+</html>

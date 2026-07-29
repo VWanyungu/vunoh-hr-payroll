@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>All Employees — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <style>
+      .filters-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        align-items: flex-end;
+        margin-bottom: var(--space-5);
+      }
+      .filters-row .input-group {
+        min-width: 160px;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card">
+            <div class="filters-row">
+              <div class="input-group">
+                <label class="input-label" for="filter-team">Team</label>
+                <select class="input-field" id="filter-team">
+                  <option value="">Any</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="filter-manager">Manager (employee ID)</label>
+                <input class="input-field" id="filter-manager" type="text" placeholder="manager employee id…" />
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="filter-type">Employment type</label>
+                <select class="input-field" id="filter-type">
+                  <option value="">Any</option>
+                  <option value="full_time">Full time</option>
+                  <option value="contract">Contract</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="filter-active">Active</label>
+                <select class="input-field" id="filter-active">
+                  <option value="">Any</option>
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="filter-search">Search (job title)</label>
+                <input class="input-field" id="filter-search" type="text" placeholder="Search job title…" />
+              </div>
+              <button class="btn btn-secondary" id="clear-filters-btn">Clear</button>
+            </div>
+            <div id="employees-list"><p>Loading…</p></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "all-employees");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("All Employees", {
+        label: "Create Employee",
+        id: "create-employee-btn",
+      });
+      document.getElementById("create-employee-btn").addEventListener("click", () => {
+        window.location.href = "html/app/admin/create-employee.html";
+      });
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "html/public/login.html";
+        }
+      });
+
+      const listEl = document.getElementById("employees-list");
+      const teamSelect = document.getElementById("filter-team");
+      const managerInput = document.getElementById("filter-manager");
+      const typeSelect = document.getElementById("filter-type");
+      const activeSelect = document.getElementById("filter-active");
+      const searchInput = document.getElementById("filter-search");
+
+      let teamNames = {};
+
+      async function loadTeamsForFilter() {
+        try {
+          const res = await apiGet("/teams");
+          const teams = res?.data?.response?.teams || [];
+          teams.forEach((t) => { teamNames[t.id] = t.name; });
+          teamSelect.innerHTML =
+            `<option value="">Any</option>` +
+            teams.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+        } catch {
+          teamSelect.innerHTML = `<option value="">Any</option>`;
+        }
+      }
+
+      async function loadEmployees() {
+        listEl.innerHTML = "<p>Loading…</p>";
+
+        const params = new URLSearchParams();
+        if (teamSelect.value) params.set("team", teamSelect.value);
+        if (managerInput.value.trim()) params.set("manager", managerInput.value.trim());
+        if (typeSelect.value) params.set("employmentType", typeSelect.value);
+        if (activeSelect.value) params.set("isActive", activeSelect.value);
+        if (searchInput.value.trim()) params.set("search", searchInput.value.trim());
+        const query = params.toString() ? `?${params.toString()}` : "";
+
+        try {
+          const res = await apiGet(`/employees${query}`);
+          const employees = res?.data?.response?.employees || [];
+
+          if (employees.length === 0) {
+            listEl.innerHTML = "<p>No employees found.</p>";
+            return;
+          }
+
+          const table = renderTable(
+            ["Name", "Job Title", "Team", "Manager", "Employment Type", "Active"],
+            employees.map((e) => [
+              escapeHtml(e.name),
+              escapeHtml(e.job_title),
+              escapeHtml(teamNames[e.team_id] || e.team_id),
+              e.manager_id ? escapeHtml(e.manager_id) : "—",
+              escapeHtml(e.employment_type),
+              e.is_active ? "Yes" : "No",
+            ]),
+          );
+
+          listEl.innerHTML = table;
+
+          listEl.querySelectorAll(".table-row").forEach((row, i) => {
+            row.addEventListener("click", () => {
+              window.location.href = `html/app/admin/employee-detail.html?id=${employees[i].id}`;
+            });
+          });
+        } catch (err) {
+          listEl.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load employees.")}</p>`;
+        }
+      }
+
+      [teamSelect, typeSelect, activeSelect].forEach((el) => el.addEventListener("change", loadEmployees));
+
+      let debounce;
+      [managerInput, searchInput].forEach((el) =>
+        el.addEventListener("input", () => {
+          clearTimeout(debounce);
+          debounce = setTimeout(loadEmployees, 300);
+        }),
+      );
+
+      document.getElementById("clear-filters-btn").addEventListener("click", () => {
+        teamSelect.value = "";
+        managerInput.value = "";
+        typeSelect.value = "";
+        activeSelect.value = "";
+        searchInput.value = "";
+        loadEmployees();
+      });
+
+      loadTeamsForFilter().then(loadEmployees);
+    </script>
+  </body>
+</html>

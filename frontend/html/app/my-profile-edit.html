@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>Edit My Profile — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <style>
+      .field-with-upload {
+        display: flex;
+        gap: var(--space-3);
+        align-items: flex-start;
+      }
+      .field-with-upload .input-field {
+        flex: 1;
+      }
+      .upload-coming-soon {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-1);
+      }
+      .upload-coming-soon small {
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 560px;" id="edit-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script>
+      requireAuth();
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-profile");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Edit My Profile");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("edit-panel");
+      const employeeId = new URLSearchParams(window.location.search).get("employeeId");
+
+      function renderForm(employee) {
+        panel.innerHTML = `
+          <h2 class="card-title">Edit My Profile</h2>
+          <form id="edit-form">
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="resume">Resume (URL)</label>
+              <div class="field-with-upload">
+                <input class="input-field" id="resume" type="text" value="${escapeHtml(employee.resume || "")}" />
+                <div class="upload-coming-soon">
+                  <input type="file" class="input-field" disabled />
+                  <small>Coming soon</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="phone">Phone</label>
+              <input class="input-field" id="phone" type="text" value="${escapeHtml(employee.phone || "")}" />
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="profilePicture">Profile picture (URL)</label>
+              <div class="field-with-upload">
+                <input class="input-field" id="profilePicture" type="text" value="${escapeHtml(employee.profile_picture || "")}" />
+                <div class="upload-coming-soon">
+                  <input type="file" class="input-field" disabled />
+                  <small>Coming soon</small>
+                </div>
+              </div>
+            </div>
+
+            <p id="edit-error" class="input-error-message" style="display: none; margin-bottom: var(--space-4);"></p>
+            <p id="edit-success" style="display: none; color: var(--color-success); margin-bottom: var(--space-4);"></p>
+
+            <div style="display: flex; gap: var(--space-3);">
+              <button class="btn btn-primary" type="submit" id="edit-submit">Save changes</button>
+              <a class="btn btn-secondary" href="html/app/my-profile.html">Cancel</a>
+            </div>
+          </form>
+        `;
+
+        const form = document.getElementById("edit-form");
+        const errorEl = document.getElementById("edit-error");
+        const successEl = document.getElementById("edit-success");
+        const submitBtn = document.getElementById("edit-submit");
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          errorEl.style.display = "none";
+          successEl.style.display = "none";
+
+          // selfUpdateEmployeeSchema only accepts resume/phone/profilePicture
+          // and requires at least one — job title/team/salary are admin-only
+          // fields on the wider schema and must never be sent from here.
+          const payload = {};
+          const resume = document.getElementById("resume").value.trim();
+          const phone = document.getElementById("phone").value.trim();
+          const profilePicture = document.getElementById("profilePicture").value.trim();
+          if (resume) payload.resume = resume;
+          if (phone) payload.phone = phone;
+          if (profilePicture) payload.profilePicture = profilePicture;
+
+          if (Object.keys(payload).length === 0) {
+            errorEl.textContent = "Enter at least one field to update.";
+            errorEl.style.display = "block";
+            return;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Saving…";
+
+          try {
+            await apiPut(`/employees/${employeeId}`, payload);
+            successEl.textContent = "Profile updated.";
+            successEl.style.display = "block";
+            setTimeout(() => {
+              window.location.href = "html/app/my-profile.html";
+            }, 800);
+          } catch (err) {
+            errorEl.textContent = err.message || "Failed to update your profile.";
+            errorEl.style.display = "block";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Save changes";
+          }
+        });
+      }
+
+      async function loadForEdit() {
+        if (!employeeId) {
+          panel.innerHTML = `
+            <h2 class="card-title">Edit My Profile</h2>
+            <p>Missing employee reference. Go back to <a href="html/app/my-profile.html">My Profile</a> and use the Edit Profile button from there.</p>
+          `;
+          return;
+        }
+
+        try {
+          const res = await apiGet(`/employees/${employeeId}`);
+          const employee = res?.data?.response?.employee;
+
+          if (!employee) {
+            panel.innerHTML = `
+              <h2 class="card-title">Edit My Profile</h2>
+              <p>No employee record found to edit.</p>
+            `;
+            return;
+          }
+
+          renderForm(employee);
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">Edit My Profile</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load your profile.")}</p>
+          `;
+        }
+      }
+
+      loadForEdit();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>Create Employee Record — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <style>
+      .field-with-upload {
+        display: flex;
+        gap: var(--space-3);
+        align-items: flex-start;
+      }
+      .field-with-upload .input-field {
+        flex: 1;
+      }
+      .upload-coming-soon {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-1);
+      }
+      .upload-coming-soon small {
+        white-space: nowrap;
+      }
+      .form-row {
+        display: flex;
+        gap: var(--space-4);
+      }
+      .form-row .input-group {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 600px;" id="form-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/components.js"></script>
+    <script>
+      // §5: employee creation is admin-only as a firm product rule, enforced
+      // here regardless of what the backend's authorize() table currently
+      // permits (it's broader than it should be — see FRONTEND_SCREENS.md §6.1
+      // item 5).
+      requireRole(["super_admin", "hr_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "all-employees");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Create Employee Record");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("form-panel");
+      const preselectedUserId = new URLSearchParams(window.location.search).get("userId");
+
+      async function loadFormData() {
+        try {
+          const [teamsRes, employeesRes, usersRes] = await Promise.all([
+            apiGet("/teams"),
+            apiGet("/employees"),
+            // Skipped entirely when ?userId= is already provided (coming
+            // from User Detail), since no user picker is needed in that case.
+            preselectedUserId ? Promise.resolve(null) : apiGet("/users?type=multiple&limit=100"),
+          ]);
+
+          const teams = teamsRes?.data?.response?.teams || [];
+          const employees = employeesRes?.data?.response?.employees || [];
+          const users = usersRes?.data?.response?.users || [];
+
+          renderForm(teams, employees, users);
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">Create Employee Record</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load form data.")}</p>
+          `;
+        }
+      }
+
+      function renderForm(teams, employees, users) {
+        const userField = preselectedUserId
+          ? `<input type="hidden" id="userId" value="${escapeHtml(preselectedUserId)}" />
+             <div class="input-group" style="margin-bottom: var(--space-4);">
+               <label class="input-label">User</label>
+               <input class="input-field" value="${escapeHtml(preselectedUserId)}" disabled />
+             </div>`
+          : `<div class="input-group" style="margin-bottom: var(--space-4);">
+               <label class="input-label" for="userId">User</label>
+               <select class="input-field" id="userId" required>
+                 <option value="" disabled selected>Select a user…</option>
+                 ${users.map((u) => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`).join("")}
+               </select>
+             </div>`;
+
+        panel.innerHTML = `
+          <h2 class="card-title">Create Employee Record</h2>
+          <form id="create-form">
+            ${userField}
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="jobTitle">Job title</label>
+              <input class="input-field" id="jobTitle" type="text" required />
+            </div>
+
+            <div class="form-row" style="margin-bottom: var(--space-4);">
+              <div class="input-group">
+                <label class="input-label" for="teamId">Team</label>
+                <select class="input-field" id="teamId" required>
+                  <option value="" disabled selected>Select a team…</option>
+                  ${teams.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="managerId">Manager (optional)</label>
+                <select class="input-field" id="managerId">
+                  <option value="">None</option>
+                  ${employees.map((e) => `<option value="${e.id}">${escapeHtml(e.job_title)} (${String(e.user_id).slice(0, 8)})</option>`).join("")}
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-bottom: var(--space-4);">
+              <div class="input-group">
+                <label class="input-label" for="startDate">Start date</label>
+                <input class="input-field" id="startDate" type="date" required />
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="salary">Salary</label>
+                <input class="input-field" id="salary" type="number" step="0.01" min="0" required />
+              </div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="employmentType">Employment type</label>
+              <select class="input-field" id="employmentType" required>
+                <option value="full_time">Full time</option>
+                <option value="contract">Contract</option>
+              </select>
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="phone">Phone (optional)</label>
+              <input class="input-field" id="phone" type="text" />
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="resume">Resume (URL, optional)</label>
+              <div class="field-with-upload">
+                <input class="input-field" id="resume" type="text" />
+                <div class="upload-coming-soon">
+                  <input type="file" class="input-field" disabled />
+                  <small>Coming soon</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="profilePicture">Profile picture (URL, optional)</label>
+              <div class="field-with-upload">
+                <input class="input-field" id="profilePicture" type="text" />
+                <div class="upload-coming-soon">
+                  <input type="file" class="input-field" disabled />
+                  <small>Coming soon</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="input-group" style="margin-bottom: var(--space-4);">
+              <label class="input-label" for="nationalId">National ID (optional)</label>
+              <input class="input-field" id="nationalId" type="number" />
+            </div>
+
+            <p id="create-error" class="input-error-message" style="display: none; margin-bottom: var(--space-4);"></p>
+
+            <button class="btn btn-primary" type="submit" id="create-submit">Create employee record</button>
+          </form>
+        `;
+
+        document.getElementById("create-form").addEventListener("submit", handleSubmit);
+      }
+
+      async function handleSubmit(e) {
+        e.preventDefault();
+        const errorEl = document.getElementById("create-error");
+        const submitBtn = document.getElementById("create-submit");
+        errorEl.style.display = "none";
+
+        const payload = {
+          userId: document.getElementById("userId").value,
+          jobTitle: document.getElementById("jobTitle").value.trim(),
+          teamId: document.getElementById("teamId").value,
+          startDate: document.getElementById("startDate").value,
+          salary: Number(document.getElementById("salary").value),
+          employmentType: document.getElementById("employmentType").value,
+        };
+
+        const managerId = document.getElementById("managerId").value;
+        const phone = document.getElementById("phone").value.trim();
+        const resume = document.getElementById("resume").value.trim();
+        const profilePicture = document.getElementById("profilePicture").value.trim();
+        const nationalId = document.getElementById("nationalId").value;
+
+        if (managerId) payload.managerId = managerId;
+        if (phone) payload.phone = phone;
+        if (resume) payload.resume = resume;
+        if (profilePicture) payload.profilePicture = profilePicture;
+        if (nationalId) payload.nationalId = Number(nationalId);
+
+        if (!payload.userId) {
+          errorEl.textContent = "Select a user for this employee record.";
+          errorEl.style.display = "block";
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Creating…";
+
+        try {
+          const res = await apiPost("/employees", payload);
+          const employee = res?.data?.response?.employee;
+          window.location.href = `html/app/admin/employee-detail.html?id=${employee.id}`;
+        } catch (err) {
+          errorEl.textContent = err.message || "Failed to create employee record.";
+          errorEl.style.display = "block";
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Create employee record";
+        }
+      }
+
+      loadFormData();
+    </script>
+  </body>
+</html>

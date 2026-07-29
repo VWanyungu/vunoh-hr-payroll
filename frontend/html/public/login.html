@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var base = document.createElement("base");
+        base.href = root;
+        document.head.appendChild(base);
+      })();
+    </script>
+    <title>Log in — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main
+      style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      "
+    >
+      <div class="card" style="width: 360px">
+        <h2 class="card-title">Log in</h2>
+
+        <form id="login-form">
+          <div class="input-group" style="margin-bottom: var(--space-4)">
+            <label class="input-label" for="email">Email</label>
+            <input
+              class="input-field"
+              id="email"
+              type="email"
+              autocomplete="username"
+              required
+            />
+          </div>
+
+          <div class="input-group" style="margin-bottom: var(--space-4)">
+            <label class="input-label" for="password">Password</label>
+            <input
+              class="input-field"
+              id="password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+
+          <p
+            id="login-error"
+            class="input-error-message"
+            style="display: none; margin-bottom: var(--space-4)"
+          ></p>
+
+          <button
+            class="btn btn-primary"
+            type="submit"
+            id="login-submit"
+            style="width: 100%"
+          >
+            Log in
+          </button>
+        </form>
+
+        <p style="margin-top: var(--space-5); font-size: var(--text-sm)">
+          <a href="html/public/forgot-password.html">Forgot password?</a>
+        </p>
+        <p style="font-size: var(--text-sm)">
+          Don't have an account?
+          <a href="html/public/register.html">Register</a>
+        </p>
+      </div>
+    </main>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+      const form = document.getElementById("login-form");
+      const errorEl = document.getElementById("login-error");
+      const submitBtn = document.getElementById("login-submit");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorEl.style.display = "none";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Logging in…";
+
+        try {
+          const email = document.getElementById("email").value.trim();
+          const password = document.getElementById("password").value;
+
+          const result = await apiPost("/login", { email, password });
+          setTokens(result.data.token, result.data.refreshToken);
+          window.location.href = "html/app/dashboard.html";
+        } catch (err) {
+          errorEl.textContent = err.message || "Invalid email or password.";
+          errorEl.style.display = "block";
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Log in";
+        }
+      });
+    </script>
+  </body>
+</html>
