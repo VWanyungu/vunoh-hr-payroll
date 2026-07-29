@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Leave Requests — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .status-pills {
+        display: flex;
+        gap: var(--space-2);
+        margin-bottom: var(--space-5);
+      }
+      .status-pill {
+        font-size: var(--text-sm);
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card">
+            <div class="status-pills" id="status-pills">
+              <button class="btn btn-secondary status-pill active" data-status="">All</button>
+              <button class="btn btn-secondary status-pill" data-status="pending">Pending</button>
+              <button class="btn btn-secondary status-pill" data-status="approved">Approved</button>
+              <button class="btn btn-secondary status-pill" data-status="rejected">Rejected</button>
+              <button class="btn btn-secondary status-pill" data-status="cancelled">Cancelled</button>
+            </div>
+            <div id="requests-list"><p>Loading…</p></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireAuth();
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-leave-requests");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("My Leave Requests", {
+        label: "New Request",
+        id: "new-request-btn",
+      });
+      document.getElementById("new-request-btn").addEventListener("click", () => {
+        window.location.href = "/html/app/employee/new-leave-request.html";
+      });
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const listEl = document.getElementById("requests-list");
+
+      const leaveTypeNamesPromise = apiGet("/leave-types")
+        .then((res) => {
+          const types = res?.data?.response?.leaveTypes || [];
+          const map = {};
+          types.forEach((t) => { map[t.id] = t.name || t.code; });
+          return map;
+        })
+        .catch(() => ({}));
+
+      async function loadRequests(status) {
+        listEl.innerHTML = "<p>Loading…</p>";
+        try {
+          const query = status ? `?status=${encodeURIComponent(status)}` : "";
+          const [res, leaveTypeNames] = await Promise.all([
+            apiGet(`/leave-requests${query}`),
+            leaveTypeNamesPromise,
+          ]);
+          const rows = res?.data?.response?.leaveRequests || [];
+
+          if (rows.length === 0) {
+            listEl.innerHTML = "<p>No leave requests yet — create one.</p>";
+            return;
+          }
+
+          const table = renderTable(
+            ["Leave Type", "Dates", "Working Days", "Status"],
+            rows.map((r) => [
+              escapeHtml(leaveTypeNames[r.leave_type_id] || r.leave_type_id),
+              `${escapeHtml(r.start_date)} – ${escapeHtml(r.end_date)}`,
+              escapeHtml(r.working_days_count),
+              renderBadge(r.status),
+            ]),
+          );
+
+          listEl.innerHTML = table;
+
+          listEl.querySelectorAll(".table-row").forEach((row, i) => {
+            row.addEventListener("click", () => {
+              window.location.href = `/html/app/employee/leave-request-detail.html?id=${rows[i].id}`;
+            });
+          });
+        } catch (err) {
+          listEl.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load leave requests.")}</p>`;
+        }
+      }
+
+      document.getElementById("status-pills").addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-status]");
+        if (!btn) return;
+
+        document.querySelectorAll(".status-pill").forEach((el) => el.classList.remove("active"));
+        btn.classList.add("active");
+        loadRequests(btn.dataset.status);
+      });
+
+      loadRequests("");
+    </script>
+  </body>
+</html>

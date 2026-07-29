@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Team Member Profile — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .profile-field {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-4);
+        padding: var(--space-3) 0;
+        border-bottom: var(--border-width) solid var(--color-border);
+      }
+      .profile-field:last-child {
+        border-bottom: none;
+      }
+      .profile-field-label {
+        font-size: var(--text-sm);
+        color: var(--color-grey-700);
+      }
+      .profile-field-value {
+        font-size: var(--text-base);
+        color: var(--color-grey-900);
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 560px;" id="profile-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireRole(["manager"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-team-roster");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Team Member Profile");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("profile-panel");
+      const employeeId = new URLSearchParams(window.location.search).get("id");
+
+      function fieldRow(label, value) {
+        return `
+          <div class="profile-field">
+            <span class="profile-field-label">${escapeHtml(label)}</span>
+            <span class="profile-field-value">${escapeHtml(value)}</span>
+          </div>
+        `;
+      }
+
+      async function loadProfile() {
+        if (!employeeId) {
+          panel.innerHTML = `<h2 class="card-title">Team Member Profile</h2><p>Missing employee id.</p>`;
+          return;
+        }
+
+        try {
+          const res = await apiGet(`/employees/${employeeId}`);
+          const employee = res?.data?.response?.employee;
+
+          if (!employee) {
+            panel.innerHTML = `<h2 class="card-title">Team Member Profile</h2><p>Employee not found.</p>`;
+            return;
+          }
+
+          let teamName = employee.team_id;
+          try {
+            const teamRes = await apiGet(`/teams/${employee.team_id}`);
+            teamName = teamRes?.data?.response?.team?.name || employee.team_id;
+          } catch {
+            // fall back to the raw team id if the team lookup fails
+          }
+
+          const rows = [
+            fieldRow("Job title", employee.job_title),
+            fieldRow("Team", teamName),
+            fieldRow("Start date", employee.start_date),
+            fieldRow("Employment type", employee.employment_type),
+            fieldRow("Phone", employee.phone || "—"),
+            fieldRow("Profile picture", employee.profile_picture || "—"),
+            fieldRow("Active", employee.is_active ? "Yes" : "No"),
+          ];
+
+          // Field-sensitivity rule (§5): the API strips salary/resume/national
+          // ID for a manager viewing a report's record — omit these fields
+          // entirely here rather than rendering them blank.
+          if (employee.salary !== undefined) rows.push(fieldRow("Salary", employee.salary));
+          if (employee.resume !== undefined) rows.push(fieldRow("Resume", employee.resume || "—"));
+          if (employee.national_id !== undefined) rows.push(fieldRow("National ID", employee.national_id));
+
+          panel.innerHTML = `
+            <h2 class="card-title">Team Member Profile</h2>
+            ${rows.join("")}
+          `;
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">Team Member Profile</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load this employee's profile.")}</p>
+          `;
+        }
+      }
+
+      loadProfile();
+    </script>
+  </body>
+</html>

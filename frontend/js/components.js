@@ -14,13 +14,13 @@ const SIDEBAR_NAV_ITEMS = [
   {
     id: "my-leave-requests",
     label: "My Leave Requests",
-    href: "/html/app/my-leave-requests.html",
+    href: "/html/app/employee/leave-requests.html",
     roles: ["employee", "manager", "hr_admin", "super_admin"],
   },
   {
     id: "my-payslips",
     label: "My Payslips",
-    href: "/html/app/my-payslips.html",
+    href: "/html/app/employee/payslips.html",
     roles: ["employee", "manager", "hr_admin", "super_admin"],
   },
   {
@@ -38,13 +38,13 @@ const SIDEBAR_NAV_ITEMS = [
   {
     id: "my-team-roster",
     label: "My Team Roster",
-    href: "/html/app/my-team-roster.html",
+    href: "/html/app/manager/team-roster.html",
     roles: ["manager"],
   },
   {
     id: "team-leave-approvals",
     label: "Team Leave Approvals",
-    href: "/html/app/team-leave-approvals.html",
+    href: "/html/app/manager/team-approvals.html",
     roles: ["manager"],
   },
   {
