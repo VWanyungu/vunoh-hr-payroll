@@ -31,7 +31,7 @@ All routes are mounted under `/v1`. Request pipeline for every `/v1/*` route: `a
 
 | Method + Path | Purpose | Auth | Key request/response fields |
 |---|---|---|---|
-| `POST /v1/login` | Authenticate, issue tokens | Public, rate-limited | req: `email`, `password`. res: `accessToken`, `refreshToken` |
+| `POST /v1/login` | Authenticate, issue tokens | Public, rate-limited | req: `email`, `password`. res: `accessToken`, `refreshToken`. Access token JWT claims: `userId, email, role[], employeeId?` (`employeeId` present only when the account has a linked employee record; `POST /v1/token` re-derives all of these from the DB rather than trusting the refresh token's own minimal claims) |
 | `POST /v1/logout` | Invalidate current token pair | Public (takes token from body, not header) | req: `token`, `refreshToken` |
 | `POST /v1/token` | Exchange refresh token for new access token | Public, rate-limited | req: `refreshToken`. res: `accessToken` |
 | `POST /v1/forgot-password` | Request a password-reset email | Public, rate-limited | req: `email`. res: emails a reset link (⚠ also returns the link in the JSON body, see [section 6](#6-gaps-and-planned-enhancements)) |
@@ -44,7 +44,7 @@ Router: `usersRouter.ts`, mounted at `/v1/users` (and again at `/v1/signup`).
 
 | Method + Path | Purpose | Auth | Key fields |
 |---|---|---|---|
-| `GET /v1/users` | List/search users (dual-mode via body) | `super_admin`, `hr_admin`, `manager` | req body: `type: "multiple"` (paginated, optional `status` filter) or `type: "single"` (`inputEmail`). res: `id, name, email, status, roles[]` |
+| `GET /v1/users` | List/search users (dual-mode via query string) | `super_admin`, `hr_admin`, `manager` | query: `type=multiple` (paginated, optional `status` filter) or `type=single&id=<uuid>` / `type=single&email=<email>` (lookup by id or email). res: `id, name, email, status, roles[]` |
 | `POST /v1/users` | Register a new account | Public | req: `name`, `email`, `password`. Created with `status: "pending"`, no role assigned |
 | `PUT /v1/users/:id` | Edit user — name/email/**status** (this is how signups get approved/rejected) | `super_admin`, `hr_admin` | req: any of `name`, `email`, `status` (`pending\|approved\|rejected`) |
 | `DELETE /v1/users` | Delete (soft-delete) a user | `super_admin` | **Currently a stub** — no `:id` param, just returns a placeholder string and performs no DB write. **Intended behavior once implemented:** soft-delete — set a `deleted` flag on the user record (mirroring the Employee table's existing `deleted` boolean) rather than a hard delete. See [section 6.1](#6-gaps-and-planned-enhancements). |
@@ -66,12 +66,12 @@ Router: `teamsRouter.ts`, mounted at `/v1/teams`.
 
 ### Employees
 
-Router: `employeesRouter.ts`, mounted at `/v1/employees`. Responses are sanitized per-viewer: `salary`, `resume`, `national_id` are stripped unless the caller is `super_admin`/`hr_admin` or viewing their own record (**note: `manager` is not in this allowlist** — a manager viewing a direct report does not see salary/resume/national_id either).
+Router: `employeesRouter.ts`, mounted at `/v1/employees`. Responses are joined to `users`, so every employee record includes `name`/`email` alongside the HR fields. Responses are sanitized per-viewer: `salary`, `resume`, `national_id` are stripped unless the caller is `super_admin`/`hr_admin` or viewing their own record (**note: `manager` is not in this allowlist** — a manager viewing a direct report does not see salary/resume/national_id either).
 
 | Method + Path | Purpose | Auth | Key fields |
 |---|---|---|---|
-| `GET /v1/employees` | List/filter employees | `super_admin`, `hr_admin`, `manager` | query: `page, limit, team, manager, employmentType, isActive, search` |
-| `GET /v1/employees/:employeeId` | Fetch one employee | `super_admin`, `hr_admin`, `manager`, `employee` (self/manager/privileged only, else 403 in-handler) | res: `jobTitle, teamId, managerId, startDate, salary*, employmentType, resume*, phone, profilePicture, nationalId*, isActive` (`*` = sanitized) |
+| `GET /v1/employees` | List/filter employees | `super_admin`, `hr_admin`, `manager` (unrestricted), `employee` (auto-scoped to their own `team_id`; any `team` query param they send is overridden server-side; 403 if the caller has no linked employee record) | query: `page, limit, team, manager, employmentType, isActive, search`. res per employee adds `name, email` (joined from `users`) |
+| `GET /v1/employees/:employeeId` | Fetch one employee | `super_admin`, `hr_admin`, `manager`, `employee` (self/manager/privileged only, else 403 in-handler) | res: `name, email, jobTitle, teamId, managerId, startDate, salary*, employmentType, resume*, phone, profilePicture, nationalId*, isActive` (`*` = sanitized) |
 | `POST /v1/employees` | Create an employee HR record | **Product decision: `super_admin` and `hr_admin` only.** ⚠ Backend's current `authorize()` table is broader — it technically permits `manager`/`employee` too (self-record only for non-privileged). The frontend must restrict the "Create Employee" screen to admins regardless, and the backend `authorize()` table should be tightened to match — see [section 6.1](#6-gaps-and-planned-enhancements). | req: `userId, jobTitle, teamId, managerId?, startDate, salary, employmentType, phone?, profilePicture?, nationalId?` |
 | `PUT /v1/employees/:employeeId` | Edit an employee | Self or privileged | Self: restricted to `resume, phone, profilePicture` only. Privileged: full schema |
 | `POST /v1/employees/:employeeId/activate` | Reactivate an employee | `super_admin`, `hr_admin` | sets `is_active = true` |
@@ -139,7 +139,7 @@ Roles come from the `user_roles.role` enum — there are exactly four, and a use
 
 | Role | Summary | Endpoint groups it can reach beyond self-service |
 |---|---|---|
-| `employee` | Base authenticated role. Self-service only: own profile, own leave, own payslips. | — |
+| `employee` | Base authenticated role. Self-service (own profile, own leave, own payslips) plus a read-only view of teammates. | `GET /employees` (list, auto-scoped to their own team) |
 | `manager` | Everything `employee` has, plus oversight of direct reports (via `employees.manager_id`). | `GET /employees` (list), leave approve/reject for reports, `GET /employees/:id` for reports |
 | `hr_admin` | Full HR & payroll administration. | Users, Teams, Employees (create/edit — see [section 6.1](#6-gaps-and-planned-enhancements) on creation being admin-only), Leave Balances (allocate), Payroll Runs, all Leave Requests, all Payslips |
 | `super_admin` | Identical reach to `hr_admin`, plus the only role permitted to call `DELETE /v1/users`. | Same as `hr_admin` + user deletion |
@@ -200,8 +200,8 @@ There's also an implicit **Public** group (unauthenticated) for login/registrati
 
 #### My Profile
 - **Purpose:** View your own employee record.
-- **Endpoints:** `GET /v1/employees/:employeeId` (own id, resolved after login) on load.
-- **UI:** read-only profile card: job title, team, manager, start date, employment type, phone, profile picture; salary/resume/national ID shown only if the viewer is privileged (they will be for their own record).
+- **Endpoints:** `GET /v1/employees/:employeeId` on load, using the `employeeId` claim decoded from the access token (present when the account has a linked employee record).
+- **UI:** read-only profile card: name, email, job title, team, manager, start date, employment type, phone, profile picture; salary/resume/national ID shown only if the viewer is privileged (they will be for their own record).
 - **States:** loading · error · **empty ("no employee record yet" — reachable if an approved user hasn't had an Employee record created for them yet)** · success.
 
 #### Edit My Profile
@@ -461,6 +461,9 @@ These are directions confirmed by the product owner. The frontend should render 
 1. **No update endpoint for leave balances.** Only `POST` (create) exists, plus the implicit deduction that happens when a leave request is approved. HR has no way to correct a mis-allocated balance via the API once it's created.
 2. **No leave-types management endpoints.** Create/update/delete for leave types don't exist — they're fixed, seeded data (`annual`, `sick`, `unpaid`). A "Leave Policy Settings" admin screen isn't buildable today; the Leave Policy Reference screen must stay read-only.
 3. ~~Employee `deleted` column has no corresponding endpoint.~~ **Resolved** — `DELETE /v1/employees/:employeeId` (`super_admin`/`hr_admin`) now sets `deleted = true`. There's still no "undelete"/restore endpoint, so deletion is final from the UI's perspective (see [section 5](#5-ux-constraints--business-rules)).
+9. ~~`GET /v1/employees` never joined `users`, so no employee `name`/`email` was ever returned — screens fell back to a truncated `user_id`.~~ **Resolved** — employee reads (`GET /v1/employees`, `GET /v1/employees/:id`) now join `users` and return `name`/`email` directly.
+10. ~~A plain `employee` could not call `GET /v1/employees` at all, so there was no team-directory-style view for non-managers.~~ **Resolved** — `employee` is now allowed, auto-scoped server-side to their own team.
+11. ~~`GET /v1/users` read its `type` discriminator (and, for single lookup, `inputEmail`) from `req.body` on a GET request, which browser `fetch` cannot send.~~ **Resolved** — `type`, `id`, and `email` are now read from the query string, and single-user lookup supports `id` in addition to `email`.
 4. **No notifications/inbox/activity-feed domain.** Leave approvals/rejections and payroll completion produce no in-app notification of any kind — the only outbound email in the whole system is the password-reset link. Any "notify the employee their leave was approved" UX needs new backend work.
 5. **No audit/history-log endpoint.** Employees track `updated_by`, but there's no endpoint to view a record's change history — the UI can show "last updated by X" but not a timeline of changes.
 6. **Backend inconsistency — not fixable from the frontend:** the login endpoint doesn't check `users.status` before issuing tokens, so `pending`/`rejected` users can technically authenticate today even though the intent is clearly that `status` gates access. Flagged for the backend owner; frontend should design defensively per the note in [section 5](#5-ux-constraints--business-rules).

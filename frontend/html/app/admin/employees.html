@@ -144,9 +144,7 @@
           const table = renderTable(
             ["Name", "Job Title", "Team", "Manager", "Employment Type", "Active"],
             employees.map((e) => [
-              // employees don't carry a `name` today (it lives on `users`,
-              // never joined here) — fall back to job title + short user id.
-              escapeHtml(e.name || `User ${String(e.user_id).slice(0, 8)}`),
+              escapeHtml(e.name),
               escapeHtml(e.job_title),
               escapeHtml(teamNames[e.team_id] || e.team_id),
               e.manager_id ? escapeHtml(e.manager_id) : "—",

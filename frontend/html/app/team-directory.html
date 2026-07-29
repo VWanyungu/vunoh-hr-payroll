@@ -134,13 +134,10 @@
             return;
           }
 
-          // The employees table has no `name` column today (it lives on
-          // `users.name`, and GET /v1/employees never joins users) — falling
-          // back to job_title + a truncated user id until that join exists.
           const table = renderTable(
             ["Name", "Job Title"],
             employees.map((e) => [
-              escapeHtml(e.name || `User ${String(e.user_id).slice(0, 8)}`),
+              escapeHtml(e.name),
               escapeHtml(e.job_title),
             ]),
           );

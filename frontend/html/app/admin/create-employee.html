@@ -86,12 +86,8 @@
           const [teamsRes, employeesRes, usersRes] = await Promise.all([
             apiGet("/teams"),
             apiGet("/employees"),
-            // NOTE: same caveat as Step 4's admin/users.html — GET /v1/users
-            // dispatches on req.body.type, which browser fetch cannot send on
-            // a GET request. This assumes the pending backend fix moves
-            // `type` to a query param. Skipped entirely when ?userId= is
-            // already provided (coming from User Detail), since no user
-            // picker is needed in that case.
+            // Skipped entirely when ?userId= is already provided (coming
+            // from User Detail), since no user picker is needed in that case.
             preselectedUserId ? Promise.resolve(null) : apiGet("/users?type=multiple&limit=100"),
           ]);
 

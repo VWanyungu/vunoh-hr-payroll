@@ -101,7 +101,7 @@
           employeeSelect.innerHTML =
             `<option value="" disabled selected>Select an employee…</option>` +
             employees
-              .map((e) => `<option value="${e.id}">${escapeHtml(e.name || e.job_title)} (${String(e.user_id).slice(0, 8)})</option>`)
+              .map((e) => `<option value="${e.id}">${escapeHtml(e.name)} — ${escapeHtml(e.job_title)}</option>`)
               .join("");
         } catch (err) {
           balancesPanel.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load employees.")}</p>`;

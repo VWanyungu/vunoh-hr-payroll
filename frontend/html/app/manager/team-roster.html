@@ -37,6 +37,7 @@
 
       const roles = getRoleNames();
       const userId = getUserId();
+      const employeeId = getEmployeeId();
 
       document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-team-roster");
       document.getElementById("topbar-slot").innerHTML = renderTopbar("My Team Roster");
@@ -54,15 +55,16 @@
 
       async function loadRoster() {
         try {
-          // GET /v1/employees?manager=:managerId needs the manager's own
-          // employeeId (not userId) — resolved by listing all employees
-          // (manager role is authorized for that) and matching on user_id,
-          // same pattern used to resolve "my own employeeId" elsewhere.
-          const allRes = await apiGet("/employees");
-          const all = allRes?.data?.response?.employees || [];
-          const self = all.find((e) => e.user_id === userId);
+          let selfId = employeeId;
 
-          if (!self) {
+          if (!selfId) {
+            const allRes = await apiGet("/employees");
+            const all = allRes?.data?.response?.employees || [];
+            const self = all.find((e) => e.user_id === userId);
+            selfId = self?.id;
+          }
+
+          if (!selfId) {
             panel.innerHTML = `
               <h2 class="card-title">My Team Roster</h2>
               <p>No employee record found for your account yet.</p>
@@ -70,7 +72,7 @@
             return;
           }
 
-          const reportsRes = await apiGet(`/employees?manager=${self.id}`);
+          const reportsRes = await apiGet(`/employees?manager=${selfId}`);
           const reports = reportsRes?.data?.response?.employees || [];
 
           if (reports.length === 0) {
@@ -84,7 +86,7 @@
           const table = renderTable(
             ["Name", "Job Title", "Employment Type", "Active"],
             reports.map((e) => [
-              escapeHtml(e.name || `User ${String(e.user_id).slice(0, 8)}`),
+              escapeHtml(e.name),
               escapeHtml(e.job_title),
               escapeHtml(e.employment_type),
               e.is_active ? "Yes" : "No",

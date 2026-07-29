@@ -109,7 +109,7 @@
           employeeSelect.innerHTML =
             `<option value="">Any</option>` +
             employees
-              .map((e) => `<option value="${e.id}">${escapeHtml(e.name || e.job_title)} (${String(e.user_id).slice(0, 8)})</option>`)
+              .map((e) => `<option value="${e.id}">${escapeHtml(e.name)} — ${escapeHtml(e.job_title)}</option>`)
               .join("");
         } catch {
           // employee picker is a filter convenience — leave it at "Any" on failure
