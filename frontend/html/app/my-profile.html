@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Profile — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .profile-field {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--space-4);
+        padding: var(--space-3) 0;
+        border-bottom: var(--border-width) solid var(--color-border);
+      }
+      .profile-field:last-child {
+        border-bottom: none;
+      }
+      .profile-field-label {
+        font-size: var(--text-sm);
+        color: var(--color-grey-700);
+      }
+      .profile-field-value {
+        font-size: var(--text-base);
+        color: var(--color-grey-900);
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 560px;" id="profile-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireAuth();
+
+      const roles = getRoleNames();
+      const userId = getUserId();
+      // Only manager/hr_admin/super_admin are authorized to call GET
+      // /v1/employees (list) per backend/v1/middlewares/authorize.ts — that's
+      // the only way to resolve "my own employeeId" from just the JWT, since
+      // the token carries no employeeId and there's no self-lookup endpoint.
+      // A plain `employee` has no documented path to this data (flagged, not
+      // guessed around) — see the field-sensitivity note below for why we
+      // don't fake a shape for them.
+      const canResolveSelf = roles.some((r) => ["manager", "hr_admin", "super_admin"].includes(r));
+
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-profile");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("My Profile");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("profile-panel");
+
+      function fieldRow(label, value) {
+        return `
+          <div class="profile-field">
+            <span class="profile-field-label">${escapeHtml(label)}</span>
+            <span class="profile-field-value">${escapeHtml(value)}</span>
+          </div>
+        `;
+      }
+
+      async function loadProfile() {
+        if (!canResolveSelf) {
+          panel.innerHTML = `
+            <h2 class="card-title">My Profile</h2>
+            <p>Unable to load your profile: there's no backend endpoint yet that lets an employee-role account
+            look up its own employee record. Ask an administrator to look up your record for now, or flag this
+            gap to the backend team.</p>
+          `;
+          return;
+        }
+
+        try {
+          const listRes = await apiGet("/employees");
+          const employees = listRes?.data?.response?.employees || [];
+          const match = employees.find((e) => e.user_id === userId);
+
+          if (!match) {
+            panel.innerHTML = `
+              <h2 class="card-title">My Profile</h2>
+              <p>No employee record yet. Once HR creates your employee record, it will show up here.</p>
+            `;
+            return;
+          }
+
+          const detailRes = await apiGet(`/employees/${match.id}`);
+          const employee = detailRes?.data?.response?.employee;
+
+          if (!employee) {
+            panel.innerHTML = `
+              <h2 class="card-title">My Profile</h2>
+              <p>No employee record yet. Once HR creates your employee record, it will show up here.</p>
+            `;
+            return;
+          }
+
+          let teamName = employee.team_id;
+          try {
+            const teamRes = await apiGet(`/teams/${employee.team_id}`);
+            teamName = teamRes?.data?.response?.team?.name || employee.team_id;
+          } catch {
+            // fall back to showing the raw team id if the team lookup fails
+          }
+
+          const rows = [
+            fieldRow("Job title", employee.job_title),
+            fieldRow("Team", teamName),
+            fieldRow("Manager ID", employee.manager_id || "—"),
+            fieldRow("Start date", employee.start_date),
+            fieldRow("Employment type", employee.employment_type),
+            fieldRow("Phone", employee.phone || "—"),
+            fieldRow("Profile picture", employee.profile_picture || "—"),
+          ];
+
+          // Field-sensitivity rule: only render salary/resume/national ID when
+          // the API actually returned them (privileged viewer or self) — never
+          // show a blank value for a field that was stripped for permissions.
+          if (employee.salary !== undefined) rows.push(fieldRow("Salary", employee.salary));
+          if (employee.resume !== undefined) rows.push(fieldRow("Resume", employee.resume || "—"));
+          if (employee.national_id !== undefined) rows.push(fieldRow("National ID", employee.national_id));
+
+          panel.innerHTML = `
+            <h2 class="card-title">My Profile</h2>
+            ${rows.join("")}
+            <div style="margin-top: var(--space-5);">
+              <a class="btn btn-primary" href="/html/app/my-profile-edit.html?employeeId=${encodeURIComponent(employee.id)}">Edit Profile</a>
+            </div>
+          `;
+        } catch (err) {
+          panel.innerHTML = `
+            <h2 class="card-title">My Profile</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load your profile.")}</p>
+          `;
+        }
+      }
+
+      loadProfile();
+    </script>
+  </body>
+</html>

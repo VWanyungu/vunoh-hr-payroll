@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Team Directory — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <style>
+      .directory-layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: var(--space-6);
+        align-items: start;
+      }
+      .team-list-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        font: inherit;
+        color: inherit;
+        padding: var(--space-3);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+      }
+      .team-list-item:hover,
+      .team-list-item.active {
+        background-color: var(--color-primary-100);
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="directory-layout">
+            <section class="card" id="teams-panel">
+              <h3 class="card-title">Teams</h3>
+              <div class="input-group" style="margin-bottom: var(--space-4);">
+                <input class="input-field" id="team-search" type="text" placeholder="Search teams…" />
+              </div>
+              <div id="teams-list"><p>Loading…</p></div>
+            </section>
+
+            <section class="card" id="roster-panel">
+              <h3 class="card-title">Roster</h3>
+              <p>Select a team to see its roster.</p>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireAuth();
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "team-directory");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Team Directory");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const teamsListEl = document.getElementById("teams-list");
+      const rosterPanel = document.getElementById("roster-panel");
+      let activeTeamId = null;
+
+      async function loadTeams(search) {
+        teamsListEl.innerHTML = "<p>Loading…</p>";
+        try {
+          const query = search ? `?name=${encodeURIComponent(search)}` : "";
+          const res = await apiGet(`/teams${query}`);
+          const teams = res?.data?.response?.teams || [];
+
+          if (teams.length === 0) {
+            teamsListEl.innerHTML = "<p>No teams yet.</p>";
+            return;
+          }
+
+          teamsListEl.innerHTML = teams
+            .map(
+              (team) => `
+                <button class="team-list-item${team.id === activeTeamId ? " active" : ""}" data-team-id="${team.id}" data-team-name="${escapeHtml(team.name)}">
+                  ${escapeHtml(team.name)}
+                </button>
+              `,
+            )
+            .join("");
+
+          teamsListEl.querySelectorAll("[data-team-id]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              teamsListEl.querySelectorAll(".team-list-item").forEach((el) => el.classList.remove("active"));
+              btn.classList.add("active");
+              loadRoster(btn.dataset.teamId, btn.dataset.teamName);
+            });
+          });
+        } catch (err) {
+          teamsListEl.innerHTML = `<p class="input-error-message">${escapeHtml(err.message || "Failed to load teams.")}</p>`;
+        }
+      }
+
+      async function loadRoster(teamId, teamName) {
+        activeTeamId = teamId;
+        rosterPanel.innerHTML = `<h3 class="card-title">${escapeHtml(teamName)} roster</h3><p>Loading…</p>`;
+
+        try {
+          const res = await apiGet(`/employees?team=${teamId}`);
+          const employees = res?.data?.response?.employees || [];
+
+          if (employees.length === 0) {
+            rosterPanel.innerHTML = `<h3 class="card-title">${escapeHtml(teamName)} roster</h3><p>No employees on this team yet.</p>`;
+            return;
+          }
+
+          // The employees table has no `name` column today (it lives on
+          // `users.name`, and GET /v1/employees never joins users) — falling
+          // back to job_title + a truncated user id until that join exists.
+          const table = renderTable(
+            ["Name", "Job Title"],
+            employees.map((e) => [
+              escapeHtml(e.name || `User ${String(e.user_id).slice(0, 8)}`),
+              escapeHtml(e.job_title),
+            ]),
+          );
+
+          rosterPanel.innerHTML = `<h3 class="card-title">${escapeHtml(teamName)} roster</h3>${table}`;
+        } catch (err) {
+          rosterPanel.innerHTML = `
+            <h3 class="card-title">${escapeHtml(teamName)} roster</h3>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load roster.")}</p>
+          `;
+        }
+      }
+
+      let searchTimeout;
+      document.getElementById("team-search").addEventListener("input", (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => loadTeams(e.target.value.trim()), 300);
+      });
+
+      loadTeams();
+    </script>
+  </body>
+</html>

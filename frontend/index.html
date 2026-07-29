@@ -5,7 +5,11 @@
     <title>Vunoh HR Payroll</title>
     <script src="/js/auth.js"></script>
     <script>
-      window.location.replace(getAccessToken() ? "/html/app/dashboard.html" : "/html/public/login.html");
+      window.location.replace(
+        getAccessToken()
+          ? "/html/app/dashboard.html"
+          : "/html/public/login.html",
+      );
     </script>
   </head>
   <body></body>

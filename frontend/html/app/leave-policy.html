@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leave Policy — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" id="policy-panel">
+            <p>Loading…</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireAuth();
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "leave-policy");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Leave Policy");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const panel = document.getElementById("policy-panel");
+
+      // Read-only reference data — there are no create/update/delete endpoints
+      // for leave types (FRONTEND_SCREENS.md §6.2 item 2), so this screen only
+      // ever renders what GET /v1/leave-types returns.
+      apiGet("/leave-types")
+        .then((res) => {
+          const types = res?.data?.response?.leaveTypes || [];
+
+          if (types.length === 0) {
+            panel.innerHTML = `
+              <h2 class="card-title">Leave Policy</h2>
+              <p>No leave types configured yet.</p>
+            `;
+            return;
+          }
+
+          const table = renderTable(
+            ["Type", "Default Allowance (days)", "Notice Required (days)", "Cover Required"],
+            types.map((t) => [
+              escapeHtml(t.name || t.code),
+              escapeHtml(t.default_allowance_days),
+              escapeHtml(t.notice_days_required),
+              t.requires_cover ? "Yes" : "No",
+            ]),
+          );
+
+          panel.innerHTML = `
+            <h2 class="card-title">Leave Policy</h2>
+            ${table}
+          `;
+        })
+        .catch((err) => {
+          panel.innerHTML = `
+            <h2 class="card-title">Leave Policy</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load leave policy.")}</p>
+          `;
+        });
+    </script>
+  </body>
+</html>
