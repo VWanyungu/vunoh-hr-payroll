@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function () {
-        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var root = /^\/frontend(\/|$)/.test(location.pathname)
+          ? "/frontend/"
+          : "/";
         var base = document.createElement("base");
         base.href = root;
         document.head.appendChild(base);
@@ -52,12 +54,12 @@
     </style>
   </head>
   <body>
-    <div style="display: flex;">
+    <div style="display: flex">
       <div id="sidebar-slot"></div>
-      <div style="flex: 1;">
+      <div style="flex: 1">
         <div id="topbar-slot"></div>
-        <main style="padding: var(--space-8);">
-          <div class="card" style="max-width: 560px;" id="detail-panel">
+        <main style="padding: var(--space-8)">
+          <div class="card" style="max-width: 560px" id="detail-panel">
             <p>Loading…</p>
           </div>
         </main>
@@ -72,24 +74,35 @@
 
       const roles = getRoleNames();
       const userId = getUserId();
-      const isPrivileged = roles.includes("hr_admin") || roles.includes("super_admin");
+      const isPrivileged =
+        roles.includes("hr_admin") || roles.includes("super_admin");
       const isManager = roles.includes("manager");
       // Only manager/hr_admin/super_admin can call GET /v1/employees (list),
       // which is what "am I viewing my own request or someone else's" needs
       // to be resolved from — see the isSelf resolution in loadDetail().
       const canListEmployees = isManager || isPrivileged;
 
-      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-leave-requests");
-      document.getElementById("topbar-slot").innerHTML = renderTopbar("Leave Request Detail");
-      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
-        e.preventDefault();
-        try {
-          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
-        } finally {
-          clearTokens();
-          window.location.href = "html/public/login.html";
-        }
-      });
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(
+        roles,
+        "my-leave-requests",
+      );
+      document.getElementById("topbar-slot").innerHTML = renderTopbar(
+        "Leave Request Detail",
+      );
+      document
+        .querySelector('[data-action="logout"]')
+        .addEventListener("click", async (e) => {
+          e.preventDefault();
+          try {
+            await apiPost("/logout", {
+              token: getAccessToken(),
+              refreshToken: getRefreshToken(),
+            });
+          } finally {
+            clearTokens();
+            window.location.href = "html/public/login.html";
+          }
+        });
 
       const panel = document.getElementById("detail-panel");
       const requestId = new URLSearchParams(window.location.search).get("id");
@@ -150,8 +163,9 @@
       }
 
       function renderDetail(leaveRequest, leaveTypes, teamCoverage, isSelf) {
-        const typeName = leaveTypes.find((t) => t.id === leaveRequest.leave_type_id)?.name
-          || leaveRequest.leave_type_id;
+        const typeName =
+          leaveTypes.find((t) => t.id === leaveRequest.leave_type_id)?.name ||
+          leaveRequest.leave_type_id;
 
         // §5 lifecycle rule: action buttons are hidden entirely once a request
         // has been decided or cancelled, not merely disabled. Which set of
@@ -187,11 +201,12 @@
         panel.innerHTML = `
           <h2 class="card-title">Leave Request Detail</h2>
           ${fieldRow("Leave type", escapeHtml(typeName))}
+          ${fieldRow("Employee", leaveRequest.employee_name)}
           ${fieldRow("Dates", `${escapeHtml(leaveRequest.start_date)} – ${escapeHtml(leaveRequest.end_date)}`)}
           ${fieldRow("Working days", escapeHtml(leaveRequest.working_days_count))}
           ${fieldRow("Status", renderBadge(leaveRequest.status))}
-          ${fieldRow("Cover employee", leaveRequest.cover_employee_id ? escapeHtml(leaveRequest.cover_employee_id) : "—")}
-          ${fieldRow("Approver", leaveRequest.approver_id ? escapeHtml(leaveRequest.approver_id) : "—")}
+          ${fieldRow("Cover employee", leaveRequest.cover_employee_name ? escapeHtml(leaveRequest.cover_employee_name) : "—")}
+          ${fieldRow("Approver", leaveRequest.approver_name ? escapeHtml(leaveRequest.approver_name) : "—")}
           ${fieldRow("Requested at", escapeHtml(leaveRequest.requested_at))}
           ${fieldRow("Decided at", leaveRequest.decided_at ? escapeHtml(leaveRequest.decided_at) : "—")}
           ${coverageBox}
@@ -207,12 +222,19 @@
         const actionError = document.getElementById("action-error");
 
         if (editBtn) {
-          editBtn.addEventListener("click", () => renderEditForm(leaveRequest, leaveTypes));
+          editBtn.addEventListener("click", () =>
+            renderEditForm(leaveRequest, leaveTypes),
+          );
         }
 
         if (cancelBtn) {
           cancelBtn.addEventListener("click", async () => {
-            if (!window.confirm("Cancel this leave request? This cannot be undone.")) return;
+            if (
+              !window.confirm(
+                "Cancel this leave request? This cannot be undone.",
+              )
+            )
+              return;
 
             cancelBtn.disabled = true;
             cancelBtn.textContent = "Cancelling…";
@@ -222,7 +244,8 @@
               await apiPost(`/leave-requests/${requestId}/cancel`, undefined);
               loadDetail();
             } catch (err) {
-              actionError.textContent = err.message || "Failed to cancel this request.";
+              actionError.textContent =
+                err.message || "Failed to cancel this request.";
               actionError.style.display = "block";
               cancelBtn.disabled = false;
               cancelBtn.textContent = "Cancel request";
@@ -240,7 +263,8 @@
               await apiPost(`/leave-requests/${requestId}/approve`, undefined);
               loadDetail();
             } catch (err) {
-              actionError.textContent = err.message || "Failed to approve this request.";
+              actionError.textContent =
+                err.message || "Failed to approve this request.";
               actionError.style.display = "block";
               approveBtn.disabled = false;
               rejectBtn.disabled = false;
@@ -260,7 +284,8 @@
               await apiPost(`/leave-requests/${requestId}/reject`, undefined);
               loadDetail();
             } catch (err) {
-              actionError.textContent = err.message || "Failed to reject this request.";
+              actionError.textContent =
+                err.message || "Failed to reject this request.";
               actionError.style.display = "block";
               approveBtn.disabled = false;
               rejectBtn.disabled = false;
@@ -278,7 +303,10 @@
               <label class="input-label" for="edit-leaveType">Leave type</label>
               <select class="input-field" id="edit-leaveType">
                 ${leaveTypes
-                  .map((t) => `<option value="${t.id}" ${t.id === leaveRequest.leave_type_id ? "selected" : ""}>${escapeHtml(t.name || t.code)}</option>`)
+                  .map(
+                    (t) =>
+                      `<option value="${t.id}" ${t.id === leaveRequest.leave_type_id ? "selected" : ""}>${escapeHtml(t.name || t.code)}</option>`,
+                  )
                   .join("")}
               </select>
             </div>
@@ -300,30 +328,35 @@
           </form>
         `;
 
-        document.getElementById("cancel-edit-btn").addEventListener("click", () => {
-          slot.innerHTML = "";
-        });
-
-        document.getElementById("edit-request-form").addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const errorEl = document.getElementById("edit-error");
-          errorEl.style.display = "none";
-
-          const payload = {
-            leaveTypeId: document.getElementById("edit-leaveType").value,
-            startDate: document.getElementById("edit-startDate").value,
-            endDate: document.getElementById("edit-endDate").value,
-          };
-
-          try {
-            await apiPut(`/leave-requests/${requestId}`, payload);
+        document
+          .getElementById("cancel-edit-btn")
+          .addEventListener("click", () => {
             slot.innerHTML = "";
-            loadDetail();
-          } catch (err) {
-            errorEl.textContent = err.message || "Failed to update this leave request.";
-            errorEl.style.display = "block";
-          }
-        });
+          });
+
+        document
+          .getElementById("edit-request-form")
+          .addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const errorEl = document.getElementById("edit-error");
+            errorEl.style.display = "none";
+
+            const payload = {
+              leaveTypeId: document.getElementById("edit-leaveType").value,
+              startDate: document.getElementById("edit-startDate").value,
+              endDate: document.getElementById("edit-endDate").value,
+            };
+
+            try {
+              await apiPut(`/leave-requests/${requestId}`, payload);
+              slot.innerHTML = "";
+              loadDetail();
+            } catch (err) {
+              errorEl.textContent =
+                err.message || "Failed to update this leave request.";
+              errorEl.style.display = "block";
+            }
+          });
       }
 
       loadDetail();

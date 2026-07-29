@@ -49,7 +49,6 @@
       requireAuth();
 
       const roles = getRoleNames();
-      const canListEmployees = roles.some((r) => ["manager", "hr_admin", "super_admin"].includes(r));
 
       document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-leave-requests");
       document.getElementById("topbar-slot").innerHTML = renderTopbar("New Leave Request");
@@ -176,15 +175,6 @@
           coverGroup.hidden = !requiresCover;
           if (!requiresCover) return;
 
-          if (!canListEmployees) {
-            coverSelect.innerHTML = "";
-            coverSelect.disabled = true;
-            coverHint.textContent =
-              "No endpoint is available yet for an employee to list their team roster — a manager or HR admin can submit this request with a cover employee on your behalf until that's added.";
-            submitBtn.disabled = true;
-            return;
-          }
-
           coverSelect.disabled = false;
           if (teamRoster === null) {
             coverSelect.innerHTML = `<option value="">Loading roster…</option>`;
@@ -196,7 +186,10 @@
             }
           }
 
-          if (teamRoster.length === 0) {
+          const ownEmployeeId = getEmployeeId();
+          const coverOptions = teamRoster.filter((e) => e.id !== ownEmployeeId);
+
+          if (coverOptions.length === 0) {
             coverSelect.innerHTML = `<option value="">No teammates available</option>`;
             coverHint.textContent = "";
             return;
@@ -204,7 +197,7 @@
 
           coverSelect.innerHTML =
             `<option value="" disabled selected>Select a cover employee…</option>` +
-            teamRoster.map((e) => `<option value="${e.id}">${escapeHtml(e.job_title)} (${String(e.user_id).slice(0, 8)})</option>`).join("");
+            coverOptions.map((e) => `<option value="${e.id}">${escapeHtml(e.name || e.job_title)}</option>`).join("");
           coverHint.textContent = "";
           submitBtn.disabled = false;
         }

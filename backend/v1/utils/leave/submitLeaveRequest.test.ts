@@ -12,7 +12,10 @@ import type { EmployeeId } from "../../types.js";
 jest.mock("../../database/utils/database.js", () => ({
   Employees: { getEmployeeById: jest.fn() },
   LeaveBalances: { getLeaveBalance: jest.fn() },
-  LeaveRequests: { createLeaveRequest: jest.fn() },
+  LeaveRequests: {
+    createLeaveRequest: jest.fn(),
+    approveLeaveRequest: jest.fn(),
+  },
   LeaveTypes: { getAllLeaveTypes: jest.fn() },
   PublicHolidays: { getHolidayDatesInRange: jest.fn() },
   Roles: { getTeamManagerUserId: jest.fn(), getHrAdminUserId: jest.fn() },
@@ -238,6 +241,56 @@ describe("submitLeaveRequest", () => {
         approverId: "hr-user-1",
       }),
     );
+    expect(result.leaveRequest).toMatchObject({ status: "pending" });
+  });
+
+  it("immediately approves when autoApprove is set, without leaving the request pending", async () => {
+    (Roles.getHrAdminUserId as jest.Mock).mockResolvedValue({
+      userId: "hr-user-1",
+    });
+    (LeaveRequests.createLeaveRequest as jest.Mock).mockImplementation(
+      async (input) => ({
+        leaveRequest: { id: "leave-request-1", ...input, status: "pending" },
+      }),
+    );
+    (LeaveRequests.approveLeaveRequest as jest.Mock).mockResolvedValue({
+      leaveRequest: { id: "leave-request-1", status: "approved" },
+    });
+
+    const result = await submitLeaveRequest({
+      employeeId: employee.id,
+      leaveTypeId: annualLeaveType.id,
+      startDate: daysFromNow(10),
+      endDate: daysFromNow(11),
+      coverEmployeeId: "cover-1" as EmployeeId,
+      autoApprove: true,
+      requestedByUserId: "hr-user-1",
+    });
+
+    expect(LeaveRequests.approveLeaveRequest).toHaveBeenCalledWith(
+      "leave-request-1",
+      "hr-user-1",
+    );
+    expect(result).toEqual({
+      leaveRequest: { id: "leave-request-1", status: "approved" },
+    });
+  });
+
+  it("does not auto-approve when autoApprove is false, even with a requestedByUserId", async () => {
+    (Roles.getHrAdminUserId as jest.Mock).mockResolvedValue({
+      userId: "hr-user-1",
+    });
+
+    const result = await submitLeaveRequest({
+      employeeId: employee.id,
+      leaveTypeId: annualLeaveType.id,
+      startDate: daysFromNow(10),
+      endDate: daysFromNow(11),
+      coverEmployeeId: "cover-1" as EmployeeId,
+      requestedByUserId: "hr-user-1",
+    });
+
+    expect(LeaveRequests.approveLeaveRequest).not.toHaveBeenCalled();
     expect(result.leaveRequest).toMatchObject({ status: "pending" });
   });
 });

@@ -37,6 +37,13 @@ For production: `npm run build && npm start` (compiles TypeScript to `dist/` and
 
 `npm run seed` (Knex `development`/`production` environment, files under `v1/seeds/`) populates a starter dataset, safe to re-run (every file checks for existing rows first): a `super_admin` and `hr_admin` account, 3 teams, 6 employee/manager accounts with linked employee records, leave types, current-year leave balances, public holidays, 3 sample leave requests (pending/approved/rejected), and one generated payroll run (June 2026) for every seeded employee. All seeded accounts use the password `password` — **these are demo credentials, not real secrets; change them before deploying anywhere reachable.** See `v1/seeds/` for the full roster and emails.
 
+### Test accounts
+
+- Super admin: super@gmail.com
+- HR: hr@gmail.com
+- Manager: amina.otieno@vunoh.io
+- Employee: brian.mwangi@vunoh.io
+
 Run tests with `npm test` (uses the `test` Knex environment and the seed files under `v1/seeds/test/`). The `test` environment points at a **separate database** (`TEST_DB_NAME`, defaults to `${DB_NAME}_test`) — the suite truncates and reseeds its fixture tables before every test, which would destroy real data if it ran against the same database as `development`. Create the test database once (`createdb ${DB_NAME}_test`); a Jest `globalSetup` migrates it automatically before the suite runs, so it never needs a manual `npm run migrate` step.
 
 ### Environment variables
@@ -61,14 +68,14 @@ Run tests with `npm test` (uses the `test` Knex environment and the seed files u
 
 **Optional, with working defaults:**
 
-| Variable                       | Default                      | Purpose                                      |
-| ------------------------------ | ---------------------------- | -------------------------------------------- |
+| Variable                       | Default                      | Purpose                                                                                                                                                          |
+| ------------------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TEST_DB_NAME`                 | `${DB_NAME}_test`            | Database used by `npm test` (`test` Knex environment) — always separate from `DB_NAME` so the test suite's truncate/reseed cycle can't touch dev/production data |
-| `CORS_ALLOWED_ORIGINS`         | falls back to `FRONTEND_URL` | Comma-separated list of allowed CORS origins |
-| `RATE_LIMIT_WINDOW_MS`         | `900000` (15 min)            | Global rate limiter window                   |
-| `RATE_LIMIT_MAX_REQUESTS`      | `100`                        | Global rate limiter max requests per window  |
-| `AUTH_RATE_LIMIT_MAX_REQUESTS` | `5`                          | Stricter limiter applied to auth routes      |
-| `LOG_LEVEL`                    | `info`                       | Pino log level                               |
+| `CORS_ALLOWED_ORIGINS`         | falls back to `FRONTEND_URL` | Comma-separated list of allowed CORS origins                                                                                                                     |
+| `RATE_LIMIT_WINDOW_MS`         | `900000` (15 min)            | Global rate limiter window                                                                                                                                       |
+| `RATE_LIMIT_MAX_REQUESTS`      | `100`                        | Global rate limiter max requests per window                                                                                                                      |
+| `AUTH_RATE_LIMIT_MAX_REQUESTS` | `5`                          | Stricter limiter applied to auth routes                                                                                                                          |
+| `LOG_LEVEL`                    | `info`                       | Pino log level                                                                                                                                                   |
 
 See `.env.example` for a filled-in starting point for local development.
 

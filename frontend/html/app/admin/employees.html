@@ -147,7 +147,7 @@
               escapeHtml(e.name),
               escapeHtml(e.job_title),
               escapeHtml(teamNames[e.team_id] || e.team_id),
-              e.manager_id ? escapeHtml(e.manager_id) : "—",
+              e.manager_name ? escapeHtml(e.manager_name) : "—",
               escapeHtml(e.employment_type),
               e.is_active ? "Yes" : "No",
             ]),

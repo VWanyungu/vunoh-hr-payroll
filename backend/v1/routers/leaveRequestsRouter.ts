@@ -176,15 +176,17 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req: AuthenticatedRequest, res) => {
   try {
     const privileged = isPrivileged(req.user);
+    const ownEmployee = await resolveEmployeeForUser(req.user!);
 
     let employeeId: string | undefined;
 
     if (privileged && req.body.employeeId) {
       employeeId = req.body.employeeId;
     } else {
-      const employee = await resolveEmployeeForUser(req.user!);
-      employeeId = employee?.id;
+      employeeId = ownEmployee?.id;
     }
+
+    const autoApprove = privileged && employeeId === ownEmployee?.id;
 
     if (!employeeId) {
       return res.status(400).json({
@@ -230,7 +232,12 @@ router.post("/", async (req: AuthenticatedRequest, res) => {
       });
     }
 
-    const response = await submitLeaveRequest({ ...value, employeeId });
+    const response = await submitLeaveRequest({
+      ...value,
+      employeeId,
+      autoApprove,
+      requestedByUserId: req.user!.userId,
+    });
 
     if (response.error) {
       if (typeof response.error === "string") {

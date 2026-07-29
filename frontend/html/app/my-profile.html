@@ -57,15 +57,6 @@
       requireAuth();
 
       const roles = getRoleNames();
-      const userId = getUserId();
-      // Only manager/hr_admin/super_admin are authorized to call GET
-      // /v1/employees (list) per backend/v1/middlewares/authorize.ts — that's
-      // the only way to resolve "my own employeeId" from just the JWT, since
-      // the token carries no employeeId and there's no self-lookup endpoint.
-      // A plain `employee` has no documented path to this data (flagged, not
-      // guessed around) — see the field-sensitivity note below for why we
-      // don't fake a shape for them.
-      const canResolveSelf = roles.some((r) => ["manager", "hr_admin", "super_admin"].includes(r));
 
       document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "my-profile");
       document.getElementById("topbar-slot").innerHTML = renderTopbar("My Profile");
@@ -91,38 +82,20 @@
       }
 
       async function loadProfile() {
-        if (!canResolveSelf) {
-          panel.innerHTML = `
-            <h2 class="card-title">My Profile</h2>
-            <p>Unable to load your profile: there's no backend endpoint yet that lets an employee-role account
-            look up its own employee record. Ask an administrator to look up your record for now, or flag this
-            gap to the backend team.</p>
-          `;
-          return;
-        }
-
         try {
-          const listRes = await apiGet("/employees");
-          const employees = listRes?.data?.response?.employees || [];
-          const match = employees.find((e) => e.user_id === userId);
-
-          if (!match) {
-            panel.innerHTML = `
-              <h2 class="card-title">My Profile</h2>
-              <p>No employee record yet. Once HR creates your employee record, it will show up here.</p>
-            `;
-            return;
-          }
-
-          const detailRes = await apiGet(`/employees/${match.id}`);
-          const employee = detailRes?.data?.response?.employee;
-
-          if (!employee) {
-            panel.innerHTML = `
-              <h2 class="card-title">My Profile</h2>
-              <p>No employee record yet. Once HR creates your employee record, it will show up here.</p>
-            `;
-            return;
+          let employee;
+          try {
+            const meRes = await apiGet("/employees/me");
+            employee = meRes?.data?.response?.employee;
+          } catch (err) {
+            if (/no employee record/i.test(err.message || "")) {
+              panel.innerHTML = `
+                <h2 class="card-title">My Profile</h2>
+                <p>No employee record yet. Once HR creates your employee record, it will show up here.</p>
+              `;
+              return;
+            }
+            throw err;
           }
 
           let teamName = employee.team_id;
@@ -136,7 +109,7 @@
           const rows = [
             fieldRow("Job title", employee.job_title),
             fieldRow("Team", teamName),
-            fieldRow("Manager ID", employee.manager_id || "—"),
+            fieldRow("Manager", employee.manager_name || "—"),
             fieldRow("Start date", employee.start_date),
             fieldRow("Employment type", employee.employment_type),
             fieldRow("Phone", employee.phone || "—"),
