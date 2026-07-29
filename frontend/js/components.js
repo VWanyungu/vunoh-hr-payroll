@@ -68,25 +68,25 @@ const SIDEBAR_NAV_ITEMS = [
   {
     id: "leave-balances-admin",
     label: "Leave Balances",
-    href: "/html/app/leave-balances-admin.html",
+    href: "/html/app/admin/leave-balances-admin.html",
     roles: ["hr_admin", "super_admin"],
   },
   {
     id: "all-leave-requests",
     label: "All Leave Requests",
-    href: "/html/app/all-leave-requests.html",
+    href: "/html/app/admin/all-leave-requests.html",
     roles: ["hr_admin", "super_admin"],
   },
   {
     id: "payroll-runs",
     label: "Payroll Runs",
-    href: "/html/app/payroll-runs.html",
+    href: "/html/app/admin/payroll-runs.html",
     roles: ["hr_admin", "super_admin"],
   },
   {
     id: "all-payslips",
     label: "All Payslips",
-    href: "/html/app/all-payslips.html",
+    href: "/html/app/admin/all-payslips.html",
     roles: ["hr_admin", "super_admin"],
   },
 ];

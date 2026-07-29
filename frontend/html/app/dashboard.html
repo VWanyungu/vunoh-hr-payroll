@@ -104,7 +104,7 @@
           const rows = res?.data?.response?.leaveRequests || [];
 
           const viewAllHref = isPrivileged
-            ? "/html/app/all-leave-requests.html"
+            ? "/html/app/admin/all-leave-requests.html"
             : isManager
               ? "/html/app/manager/team-approvals.html"
               : "/html/app/employee/leave-requests.html";
