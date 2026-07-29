@@ -1,3 +1,4 @@
+// const API_BASE_URL = "http://localhost:3000/v1";
 const API_BASE_URL = "http://localhost:3000/v1";
 
 async function apiRequest(method, path, body) {

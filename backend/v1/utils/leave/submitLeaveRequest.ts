@@ -12,7 +12,11 @@ import type { CreateLeaveRequestInput, EmployeeId, UserId } from "../../types.js
 // TODO(follow-up): team coverage check + surface a `warnings` array on the
 // return value, and overlapping-request detection for the same employee.
 export async function submitLeaveRequest(
-  input: CreateLeaveRequestInput & { employeeId: EmployeeId },
+  input: CreateLeaveRequestInput & {
+    employeeId: EmployeeId;
+    autoApprove?: boolean;
+    requestedByUserId?: UserId;
+  },
 ) {
   const { employee } = await Employees.getEmployeeById(input.employeeId);
   if (!employee) {
@@ -89,9 +93,22 @@ export async function submitLeaveRequest(
     return { leaveRequest: null, error: "no_approver_available" as const };
   }
 
-  return LeaveRequests.createLeaveRequest({
+  const { leaveRequest, error } = await LeaveRequests.createLeaveRequest({
     ...input,
     workingDaysCount,
     approverId,
   });
+
+  if (!leaveRequest || error) {
+    return { leaveRequest, error };
+  }
+
+  if (input.autoApprove && input.requestedByUserId) {
+    return LeaveRequests.approveLeaveRequest(
+      leaveRequest.id,
+      input.requestedByUserId,
+    );
+  }
+
+  return { leaveRequest, error };
 }

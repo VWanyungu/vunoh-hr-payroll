@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function () {
-        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var root = /^\/frontend(\/|$)/.test(location.pathname)
+          ? "/frontend/"
+          : "/";
         var base = document.createElement("base");
         base.href = root;
         document.head.appendChild(base);
@@ -37,11 +39,11 @@
     </style>
   </head>
   <body>
-    <div style="display: flex;">
+    <div style="display: flex">
       <div id="sidebar-slot"></div>
-      <div style="flex: 1;">
+      <div style="flex: 1">
         <div id="topbar-slot"></div>
-        <main style="padding: var(--space-8);">
+        <main style="padding: var(--space-8)">
           <div class="dashboard-grid">
             <section class="card" id="panel-pending">
               <h3 class="card-title">Pending Leave Requests</h3>
@@ -49,7 +51,7 @@
             </section>
 
             <section class="card" id="panel-balances">
-              <h3 class="card-title">My Leave Balances</h3>
+              <h3 class="card-title">Leave Balances</h3>
               <p>Loading…</p>
             </section>
 
@@ -74,20 +76,30 @@
       requireAuth();
 
       const roles = getRoleNames();
-      const isPrivileged = roles.includes("hr_admin") || roles.includes("super_admin");
+      const isPrivileged =
+        roles.includes("hr_admin") || roles.includes("super_admin");
       const isManager = roles.includes("manager");
 
-      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "dashboard");
-      document.getElementById("topbar-slot").innerHTML = renderTopbar("Dashboard");
-      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
-        e.preventDefault();
-        try {
-          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
-        } finally {
-          clearTokens();
-          window.location.href = "html/public/login.html";
-        }
-      });
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(
+        roles,
+        "dashboard",
+      );
+      document.getElementById("topbar-slot").innerHTML =
+        renderTopbar("Dashboard");
+      document
+        .querySelector('[data-action="logout"]')
+        .addEventListener("click", async (e) => {
+          e.preventDefault();
+          try {
+            await apiPost("/logout", {
+              token: getAccessToken(),
+              refreshToken: getRefreshToken(),
+            });
+          } finally {
+            clearTokens();
+            window.location.href = "html/public/login.html";
+          }
+        });
 
       const todayIso = new Date().toISOString().slice(0, 10);
       const now = new Date();
@@ -97,9 +109,12 @@
       // used only to resolve leave_type_id -> a human-readable name for display.
       const leaveTypeNamesPromise = apiGet("/leave-types")
         .then((res) => {
-          const types = res?.data?.response?.leaveTypes || res?.data?.response || [];
+          const types =
+            res?.data?.response?.leaveTypes || res?.data?.response || [];
           const map = {};
-          types.forEach((t) => { map[t.id] = t.name || t.code; });
+          types.forEach((t) => {
+            map[t.id] = t.name || t.code;
+          });
           return map;
         })
         .catch(() => ({}));
@@ -127,11 +142,13 @@
 
           const table = renderTable(
             ["Dates", "Days", "Status"],
-            rows.slice(0, 5).map((r) => [
-              `${escapeHtml(r.start_date)} – ${escapeHtml(r.end_date)}`,
-              escapeHtml(r.working_days_count),
-              renderBadge(r.status),
-            ]),
+            rows
+              .slice(0, 5)
+              .map((r) => [
+                `${escapeHtml(r.start_date)} – ${escapeHtml(r.end_date)}`,
+                escapeHtml(r.working_days_count),
+                renderBadge(r.status),
+              ]),
           );
 
           el.innerHTML = `
@@ -160,18 +177,19 @@
 
           if (rows.length === 0) {
             el.innerHTML = `
-              <h3 class="card-title">My Leave Balances</h3>
+              <h3 class="card-title">Leave Balances</h3>
               <p class="panel-meta">No balance allocated yet for ${now.getFullYear()}.</p>
             `;
             return;
           }
 
           const table = renderTable(
-            ["Leave Type", "Allocated", "Used", "Remaining"],
-            rows.map((r) => [
+            ["Employee", "Leave Type", "Remaining"],
+            rows.slice(0, 5).map((r) => [
+              escapeHtml(r.employee_name),
               escapeHtml(leaveTypeNames[r.leave_type_id] || r.leave_type_id),
-              escapeHtml(r.allocated),
-              escapeHtml(r.used),
+              // escapeHtml(r.allocated),
+              // escapeHtml(r.used),
               escapeHtml(r.remaining),
             ]),
           );
@@ -192,7 +210,8 @@
       // ---- Panel: Who's Out (manager/HR/super_admin) or My Upcoming Leave (employee) ----
       (async function renderWhosOutPanel() {
         const el = document.getElementById("panel-whosout");
-        const title = isPrivileged || isManager ? "Who's Out" : "My Upcoming Leave";
+        const title =
+          isPrivileged || isManager ? "Who's Out" : "My Upcoming Leave";
 
         try {
           // No server-side date-range filter exists on this endpoint — the
@@ -200,25 +219,30 @@
           const res = await apiGet("/leave-requests?status=approved");
           const rows = res?.data?.response?.leaveRequests || [];
 
-          const filtered = (isPrivileged || isManager)
-            ? rows.filter((r) => r.start_date <= todayIso && r.end_date >= todayIso)
-            : rows.filter((r) => r.end_date >= todayIso);
+          const filtered =
+            isPrivileged || isManager
+              ? rows.filter(
+                  (r) => r.start_date <= todayIso && r.end_date >= todayIso,
+                )
+              : rows.filter((r) => r.end_date >= todayIso);
 
           if (filtered.length === 0) {
             el.innerHTML = `
               <h3 class="card-title">${title}</h3>
-              <p class="panel-meta">${(isPrivileged || isManager) ? "No one out today." : "No upcoming leave."}</p>
+              <p class="panel-meta">${isPrivileged || isManager ? "No one out today." : "No upcoming leave."}</p>
             `;
             return;
           }
 
           const table = renderTable(
             ["Dates", "Days", "Status"],
-            filtered.slice(0, 5).map((r) => [
-              `${escapeHtml(r.start_date)} – ${escapeHtml(r.end_date)}`,
-              escapeHtml(r.working_days_count),
-              renderBadge(r.status),
-            ]),
+            filtered
+              .slice(0, 5)
+              .map((r) => [
+                `${escapeHtml(r.start_date)} – ${escapeHtml(r.end_date)}`,
+                escapeHtml(r.working_days_count),
+                renderBadge(r.status),
+              ]),
           );
 
           el.innerHTML = `
@@ -236,14 +260,21 @@
       // ---- Panel: Payslip for a Period ----
       function renderPayslipPanel() {
         const el = document.getElementById("panel-payslip");
-        const month = Number(document.getElementById("payslip-month")?.value) || now.getMonth() + 1;
-        const year = Number(document.getElementById("payslip-year")?.value) || now.getFullYear();
+        const month =
+          Number(document.getElementById("payslip-month")?.value) ||
+          now.getMonth();
+        const year =
+          Number(document.getElementById("payslip-year")?.value) ||
+          now.getFullYear();
 
         const picker = `
           <div class="panel-period-picker">
             <select class="input-field" id="payslip-month">
               ${Array.from({ length: 12 }, (_, i) => i + 1)
-                .map((m) => `<option value="${m}" ${m === month ? "selected" : ""}>${String(m).padStart(2, "0")}</option>`)
+                .map(
+                  (m) =>
+                    `<option value="${m}" ${m === month ? "selected" : ""}>${String(m).padStart(2, "0")}</option>`,
+                )
                 .join("")}
             </select>
             <input class="input-field" id="payslip-year" type="number" min="2000" max="2100" value="${year}" />
@@ -256,8 +287,12 @@
           <p>Loading…</p>
         `;
 
-        document.getElementById("payslip-month").addEventListener("change", renderPayslipPanel);
-        document.getElementById("payslip-year").addEventListener("change", renderPayslipPanel);
+        document
+          .getElementById("payslip-month")
+          .addEventListener("change", renderPayslipPanel);
+        document
+          .getElementById("payslip-year")
+          .addEventListener("change", renderPayslipPanel);
 
         apiGet(`/payslips?periodMonth=${month}&periodYear=${year}`)
           .then((res) => {
@@ -278,7 +313,7 @@
               <h3 class="card-title">Payslip for a Period</h3>
               ${picker}
               <div class="panel-meta">
-                Gross: ${escapeHtml(payslip.gross_pay)} &middot; Net: ${escapeHtml(payslip.net_pay)}
+                ${rows.slice(0, 5).map((r) => `<p>${r.employee_name} &middot;  Gross: ${escapeHtml(r.gross_pay)} &middot; Net: ${escapeHtml(r.net_pay)} </p>`)}
               </div>
               <div class="panel-footer"><a href="html/app/employee/payslips.html">View all &rarr;</a></div>
             `;
@@ -294,8 +329,12 @@
           });
 
         function wirePicker() {
-          document.getElementById("payslip-month").addEventListener("change", renderPayslipPanel);
-          document.getElementById("payslip-year").addEventListener("change", renderPayslipPanel);
+          document
+            .getElementById("payslip-month")
+            .addEventListener("change", renderPayslipPanel);
+          document
+            .getElementById("payslip-year")
+            .addEventListener("change", renderPayslipPanel);
         }
       }
 

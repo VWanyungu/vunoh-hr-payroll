@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function () {
-        var root = /^\/frontend(\/|$)/.test(location.pathname) ? "/frontend/" : "/";
+        var root = /^\/frontend(\/|$)/.test(location.pathname)
+          ? "/frontend/"
+          : "/";
         var base = document.createElement("base");
         base.href = root;
         document.head.appendChild(base);
@@ -49,12 +51,12 @@
     </style>
   </head>
   <body>
-    <div style="display: flex;">
+    <div style="display: flex">
       <div id="sidebar-slot"></div>
-      <div style="flex: 1;">
+      <div style="flex: 1">
         <div id="topbar-slot"></div>
-        <main style="padding: var(--space-8);">
-          <div class="card" style="max-width: 620px;" id="detail-panel">
+        <main style="padding: var(--space-8)">
+          <div class="card" style="max-width: 620px" id="detail-panel">
             <p>Loading…</p>
           </div>
         </main>
@@ -70,17 +72,26 @@
       const viewerRoles = getRoleNames();
       const isSuperAdmin = viewerRoles.includes("super_admin");
 
-      document.getElementById("sidebar-slot").innerHTML = renderSidebar(viewerRoles, "user-accounts");
-      document.getElementById("topbar-slot").innerHTML = renderTopbar("User Detail");
-      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
-        e.preventDefault();
-        try {
-          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
-        } finally {
-          clearTokens();
-          window.location.href = "html/public/login.html";
-        }
-      });
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(
+        viewerRoles,
+        "user-accounts",
+      );
+      document.getElementById("topbar-slot").innerHTML =
+        renderTopbar("User Detail");
+      document
+        .querySelector('[data-action="logout"]')
+        .addEventListener("click", async (e) => {
+          e.preventDefault();
+          try {
+            await apiPost("/logout", {
+              token: getAccessToken(),
+              refreshToken: getRefreshToken(),
+            });
+          } finally {
+            clearTokens();
+            window.location.href = "html/public/login.html";
+          }
+        });
 
       const panel = document.getElementById("detail-panel");
       const userId = new URLSearchParams(window.location.search).get("id");
@@ -114,7 +125,9 @@
           }
 
           const employees = employeesRes?.data?.response?.employees || [];
-          const hasEmployeeRecord = employees.some((e) => e.user_id === user.id);
+          const hasEmployeeRecord = employees.some(
+            (e) => e.user_id === user.id,
+          );
 
           renderUser(user, hasEmployeeRecord);
         } catch (err) {
@@ -126,25 +139,27 @@
       }
 
       function renderUser(user, hasEmployeeRecord) {
-        const roleRows = (user.roles || [])
-          .map(
-            (r) => `
+        const roleRows =
+          (user.roles || [])
+            .map(
+              (r) => `
               <div class="role-row">
                 <span>${escapeHtml(r.role)}${r.team_id ? ` (team: ${escapeHtml(r.team_id)})` : ""}</span>
                 <button class="btn btn-ghost revoke-role-btn" data-role-id="${r.id}">Revoke</button>
               </div>
             `,
-          )
-          .join("") || "<p>No roles assigned.</p>";
+            )
+            .join("") || "<p>No roles assigned.</p>";
 
-        const createEmployeePrompt = user.status === "approved" && !hasEmployeeRecord
-          ? `
+        const createEmployeePrompt =
+          user.status === "approved" && !hasEmployeeRecord
+            ? `
             <div class="info-banner">
               This user is approved but has no employee record yet.
               <a href="html/app/admin/create-employee.html?userId=${user.id}">Create Employee Record</a>
             </div>
           `
-          : "";
+            : "";
 
         panel.innerHTML = `
           <h2 class="card-title">User Detail</h2>
@@ -181,19 +196,23 @@
             <button class="btn btn-secondary" type="submit">Add role</button>
           </form>
 
-          <div class="section-title">Account access</div>
-          <div style="display: flex; gap: var(--space-3); align-items: center;">
-            <button class="btn btn-secondary" disabled>Activate / Deactivate</button>
-            <small>Coming soon</small>
-          </div>
+          <!-- <div class="section-title">Account access</div>
+            <div style="display: flex; gap: var(--space-3); align-items: center;">
+              <button class="btn btn-secondary" disabled>Activate / Deactivate</button>
+              <small>Coming soon</small>
+          </div> -->
 
-          ${isSuperAdmin ? `
-            <div class="section-title">Danger zone</div>
+          ${
+            isSuperAdmin
+              ? `
+            <!-- <div class="section-title">Danger zone</div>
             <div style="display: flex; gap: var(--space-3); align-items: center;">
               <button class="btn btn-danger" disabled>Delete user (soft-delete)</button>
               <small>Coming soon — current DELETE /v1/users endpoint is a non-functional stub</small>
-            </div>
-          ` : ""}
+            </div> -->
+          `
+              : ""
+          }
         `;
 
         wireActions(user);
@@ -230,7 +249,10 @@
             btn.disabled = true;
 
             try {
-              await apiPost(`/users/${user.id}/role/${btn.dataset.roleId}`, undefined);
+              await apiPost(
+                `/users/${user.id}/role/${btn.dataset.roleId}`,
+                undefined,
+              );
               loadUser();
             } catch (err) {
               roleError.textContent = err.message || "Failed to revoke role.";
@@ -257,7 +279,12 @@
             try {
               const res = await apiGet("/teams");
               const teams = res?.data?.response?.teams || [];
-              teamSelect.innerHTML = teams.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+              teamSelect.innerHTML = teams
+                .map(
+                  (t) =>
+                    `<option value="${t.id}">${escapeHtml(t.name)}</option>`,
+                )
+                .join("");
               teamSelect.dataset.loaded = "true";
             } catch {
               teamSelect.innerHTML = `<option value="">Failed to load teams</option>`;
@@ -265,28 +292,30 @@
           }
         });
 
-        document.getElementById("assign-role-form").addEventListener("submit", async (e) => {
-          e.preventDefault();
-          roleError.style.display = "none";
+        document
+          .getElementById("assign-role-form")
+          .addEventListener("submit", async (e) => {
+            e.preventDefault();
+            roleError.style.display = "none";
 
-          const payload = { role: roleSelect.value };
-          if (roleSelect.value === "manager") {
-            if (!teamSelect.value) {
-              roleError.textContent = "Select a team for the manager role.";
-              roleError.style.display = "block";
-              return;
+            const payload = { role: roleSelect.value };
+            if (roleSelect.value === "manager") {
+              if (!teamSelect.value) {
+                roleError.textContent = "Select a team for the manager role.";
+                roleError.style.display = "block";
+                return;
+              }
+              payload.teamId = teamSelect.value;
             }
-            payload.teamId = teamSelect.value;
-          }
 
-          try {
-            await apiPost(`/users/${user.id}/role`, payload);
-            loadUser();
-          } catch (err) {
-            roleError.textContent = err.message || "Failed to assign role.";
-            roleError.style.display = "block";
-          }
-        });
+            try {
+              await apiPost(`/users/${user.id}/role`, payload);
+              loadUser();
+            } catch (err) {
+              roleError.textContent = err.message || "Failed to assign role.";
+              roleError.style.display = "block";
+            }
+          });
       }
 
       loadUser();
