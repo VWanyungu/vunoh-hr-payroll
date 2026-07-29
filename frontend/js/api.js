@@ -44,6 +44,10 @@ function apiPut(path, body) {
   return apiRequest("PUT", path, body);
 }
 
+function apiPatch(path, body) {
+  return apiRequest("PATCH", path, body);
+}
+
 function apiDelete(path, body) {
   return apiRequest("DELETE", path, body);
 }

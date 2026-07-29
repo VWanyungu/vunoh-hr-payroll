@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Team Detail — Vunoh HR Payroll</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+  </head>
+  <body>
+    <div style="display: flex;">
+      <div id="sidebar-slot"></div>
+      <div style="flex: 1;">
+        <div id="topbar-slot"></div>
+        <main style="padding: var(--space-8);">
+          <div class="card" style="max-width: 640px; margin-bottom: var(--space-6);" id="team-panel">
+            <p>Loading…</p>
+          </div>
+          <div class="card" style="max-width: 640px;" id="roster-panel"></div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+      requireRole(["hr_admin", "super_admin"]);
+
+      const roles = getRoleNames();
+      document.getElementById("sidebar-slot").innerHTML = renderSidebar(roles, "teams");
+      document.getElementById("topbar-slot").innerHTML = renderTopbar("Team Detail");
+      document.querySelector('[data-action="logout"]').addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await apiPost("/logout", { token: getAccessToken(), refreshToken: getRefreshToken() });
+        } finally {
+          clearTokens();
+          window.location.href = "/html/public/login.html";
+        }
+      });
+
+      const teamPanel = document.getElementById("team-panel");
+      const rosterPanel = document.getElementById("roster-panel");
+      const teamId = new URLSearchParams(window.location.search).get("id");
+
+      let currentRosterCount = 0;
+
+      async function loadTeam() {
+        if (!teamId) {
+          teamPanel.innerHTML = `<h2 class="card-title">Team Detail</h2><p>Missing team id.</p>`;
+          return;
+        }
+
+        try {
+          const [teamRes, rosterRes] = await Promise.all([
+            apiGet(`/teams/${teamId}`),
+            apiGet(`/employees?team=${teamId}`),
+          ]);
+
+          const team = teamRes?.data?.response?.team;
+          const roster = rosterRes?.data?.response?.employees || [];
+          currentRosterCount = roster.length;
+
+          if (!team) {
+            teamPanel.innerHTML = `<h2 class="card-title">Team Detail</h2><p>Team not found.</p>`;
+            rosterPanel.innerHTML = "";
+            return;
+          }
+
+          renderTeam(team);
+          renderRoster(roster);
+        } catch (err) {
+          teamPanel.innerHTML = `
+            <h2 class="card-title">Team Detail</h2>
+            <p class="input-error-message">${escapeHtml(err.message || "Failed to load this team.")}</p>
+          `;
+          rosterPanel.innerHTML = "";
+        }
+      }
+
+      function renderTeam(team) {
+        teamPanel.innerHTML = `
+          <h2 class="card-title">Team Detail</h2>
+          <form id="rename-form" style="display: flex; gap: var(--space-3); align-items: flex-end; margin-bottom: var(--space-4);">
+            <div class="input-group" style="flex: 1;">
+              <label class="input-label" for="team-name">Name</label>
+              <input class="input-field" id="team-name" type="text" value="${escapeHtml(team.name)}" required />
+            </div>
+            <button class="btn btn-secondary" type="submit">Rename</button>
+          </form>
+          <p id="rename-error" class="input-error-message" style="display: none; margin-bottom: var(--space-4);"></p>
+          <p id="rename-success" style="display: none; color: var(--color-success); margin-bottom: var(--space-4);"></p>
+
+          <button class="btn btn-danger" id="delete-team-btn">Delete team</button>
+          <p id="delete-error" class="input-error-message" style="display: none; margin-top: var(--space-3);"></p>
+        `;
+
+        document.getElementById("rename-form").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const errorEl = document.getElementById("rename-error");
+          const successEl = document.getElementById("rename-success");
+          errorEl.style.display = "none";
+          successEl.style.display = "none";
+
+          try {
+            await apiPatch(`/teams/${teamId}`, { name: document.getElementById("team-name").value.trim() });
+            successEl.textContent = "Team renamed.";
+            successEl.style.display = "block";
+          } catch (err) {
+            errorEl.textContent = err.message || "Failed to rename this team.";
+            errorEl.style.display = "block";
+          }
+        });
+
+        document.getElementById("delete-team-btn").addEventListener("click", async () => {
+          if (!window.confirm("Delete this team? This cannot be undone.")) return;
+
+          const deleteBtn = document.getElementById("delete-team-btn");
+          const deleteError = document.getElementById("delete-error");
+          deleteBtn.disabled = true;
+          deleteError.style.display = "none";
+
+          try {
+            await apiDelete(`/teams/${teamId}`, undefined);
+            window.location.href = "/html/app/admin/teams.html";
+          } catch (err) {
+            // The API returns a flat 409 with no employee count — the count
+            // is already in hand from the roster fetch above, so we use that
+            // instead of a raw "Cannot delete team with assigned employees".
+            if (err.message && err.message.toLowerCase().includes("assigned employees")) {
+              deleteError.textContent = `Reassign ${currentRosterCount} employee${currentRosterCount === 1 ? "" : "s"} before deleting this team.`;
+            } else {
+              deleteError.textContent = err.message || "Failed to delete this team.";
+            }
+            deleteError.style.display = "block";
+            deleteBtn.disabled = false;
+          }
+        });
+      }
+
+      function renderRoster(roster) {
+        if (roster.length === 0) {
+          rosterPanel.innerHTML = `<h3 class="card-title">Roster</h3><p>No employees on this team yet.</p>`;
+          return;
+        }
+
+        // employees don't carry a `name` today (it lives on `users`, never
+        // joined here) — fall back to job title + a short user id.
+        const table = renderTable(
+          ["Name", "Job Title"],
+          roster.map((e) => [
+            escapeHtml(e.name || `User ${String(e.user_id).slice(0, 8)}`),
+            escapeHtml(e.job_title),
+          ]),
+        );
+
+        rosterPanel.innerHTML = `<h3 class="card-title">Roster</h3>${table}`;
+      }
+
+      loadTeam();
+    </script>
+  </body>
+</html>
