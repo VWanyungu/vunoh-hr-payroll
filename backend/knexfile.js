@@ -23,7 +23,11 @@ export default {
       host: process.env.DB_HOST,
       port: process.env.DB_PORT,
       user: process.env.DB_USER,
-      database: process.env.DB_NAME,
+      // Deliberately a separate database from "development" — the test
+      // suite truncates and reseeds fixture tables before every test
+      // (see v1/tests/integration/helpers/db.ts), which would otherwise
+      // destroy real dev/production data on every `npm test` run.
+      database: process.env.TEST_DB_NAME || `${process.env.DB_NAME}_test`,
       password: process.env.DB_PASSWORD,
     },
     migrations: {

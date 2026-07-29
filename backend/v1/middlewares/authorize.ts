@@ -53,7 +53,7 @@ export default function authorize() {
       {
         method: "GET",
         pattern: /^\/v1\/employees$/,
-        roles: ["super_admin", "hr_admin", "manager"],
+        roles: ["super_admin", "hr_admin", "manager", "employee"],
       },
       {
         method: "GET",

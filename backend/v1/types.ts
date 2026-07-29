@@ -19,6 +19,7 @@ export type AuthUser = {
   userId: UserId;
   email: string;
   role?: UserRoles[] | [];
+  employeeId?: EmployeeId;
 };
 
 export type AuthenticatedRequest = Request & {
@@ -49,6 +50,8 @@ export type UserLookupResult = {
   email?: string;
   passwordHash?: string;
   role?: UserRoles[];
+  name?: string;
+  status?: UserStatus;
 };
 
 export type JwtTokenType = "all" | "forgotPassword" | "refreshToken" | "token";

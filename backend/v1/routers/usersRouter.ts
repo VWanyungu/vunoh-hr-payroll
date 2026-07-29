@@ -20,7 +20,7 @@ import type {
 
 router.get("/", async (req: AuthenticatedRequest, res) => {
   const user = req.user;
-  const { type } = req.body;
+  const { type, email, id } = req.query;
 
   const userRoles: string[] = [];
 
@@ -31,7 +31,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
   });
 
   if (userRoles.length < 1) {
-    res.status(401).json({
+    return res.status(401).json({
       status: "error",
       data: null,
       message: "You are not authorized to access this resource",
@@ -78,11 +78,22 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
       break;
 
     case "single":
-      const { inputEmail } = req.body;
       try {
-        const user = await Users.getSingleUserByEmail(inputEmail);
+        let lookup;
 
-        if (user.email == undefined || user.userId == undefined) {
+        if (id !== undefined) {
+          lookup = await Users.getSingleUserById(String(id));
+        } else if (email !== undefined) {
+          lookup = await Users.getSingleUserByEmail(String(email));
+        } else {
+          return res.status(400).json({
+            status: "error",
+            data: null,
+            message: "Provide id or email",
+          });
+        }
+
+        if (lookup.email == undefined || lookup.userId == undefined) {
           return res.status(404).json({
             status: "error",
             data: null,
@@ -93,9 +104,11 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
         res.status(200).json({
           status: "success",
           data: {
-            userId: user.userId,
-            email: user.email,
-            role: user.role,
+            id: lookup.userId,
+            name: lookup.name,
+            email: lookup.email,
+            status: lookup.status,
+            roles: lookup.role,
           },
           message: "User retrieved successfully",
         });
@@ -112,7 +125,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
       res.status(400).json({
         status: "error",
         data: null,
-        message: "Specify type of fetch in request body",
+        message: "Specify type of fetch in query",
       });
   }
 });

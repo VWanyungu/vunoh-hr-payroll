@@ -10,4 +10,5 @@ module.exports = {
   },
   testMatch: ["**/v1/**/*.test.ts"],
   setupFiles: ["<rootDir>/v1/tests/integration/helpers/setupEnv.cjs"],
+  globalSetup: "<rootDir>/v1/tests/integration/helpers/globalSetup.cjs",
 };

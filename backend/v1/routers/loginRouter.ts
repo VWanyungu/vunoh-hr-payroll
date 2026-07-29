@@ -1,8 +1,8 @@
 import express from "express";
-import { Users } from "../database/utils/database.js";
+import { Users, Employees } from "../database/utils/database.js";
 import generateJwtToken from "../utils/generateJwtToken.js";
 import bcrypt from "bcrypt";
-import type { AuthUser, UserId } from "../types.js";
+import type { AuthUser, EmployeeId, UserId } from "../types.js";
 import { Tokens } from "../database/utils/database.js";
 
 const router = express.Router();
@@ -25,12 +25,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const payload: AuthUser = {
-      userId: user.userId as UserId,
-      email: user.email,
-      role: user.role ? user.role : [],
-    };
-
     bcrypt.compare(password, user.passwordHash, async function (err, result) {
       if (err) {
         res.status(500).json({
@@ -41,6 +35,17 @@ router.post("/", async (req, res) => {
       }
 
       if (result) {
+        const { employee } = await Employees.getEmployeeByUserId(
+          user.userId as UserId,
+        );
+
+        const payload: AuthUser = {
+          userId: user.userId as UserId,
+          email: user.email as string,
+          role: user.role ? user.role : [],
+          ...(employee && { employeeId: employee.id as EmployeeId }),
+        };
+
         const { token, refreshToken } = generateJwtToken(payload as any, "all");
 
         const storeTokenRes = await Tokens.addRefreshToken(

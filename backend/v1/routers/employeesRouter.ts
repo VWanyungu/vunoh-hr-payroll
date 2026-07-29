@@ -1,6 +1,10 @@
 import express from "express";
 const router = express.Router();
-import { Employees, sanitizeEmployee } from "../database/utils/database.js";
+import {
+  Employees,
+  sanitizeEmployee,
+  resolveEmployeeForUser,
+} from "../database/utils/database.js";
 import {
   createEmployeeSchema,
   updateEmployeeSchema,
@@ -34,6 +38,22 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
       data: { errors: errorMessages },
       message: "Wrong query input",
     });
+  }
+
+  const isManager = req.user?.role?.some((r) => r.role === "manager");
+
+  if (!isPrivileged(req.user) && !isManager) {
+    const callerEmployee = await resolveEmployeeForUser(req.user!);
+
+    if (!callerEmployee) {
+      return res.status(403).json({
+        status: "error",
+        data: null,
+        message: "No employee record linked to this account",
+      });
+    }
+
+    value.team = callerEmployee.team_id;
   }
 
   try {
