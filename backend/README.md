@@ -8,7 +8,7 @@ A Kenya-focused HR and payroll REST API built with Express 5, TypeScript, and Kn
 - **Framework**: Express 5
 - **Database**: PostgreSQL via Knex (query builder)
 - **Cache**: Upstash Redis (REST-based client, not a `redis://` connection)
-- **Auth**: JWT (access/refresh/forgot-password tokens), bcrypt password hashing
+- **Auth**: JWT (access/refresh/forgot-password tokens), bcrypt password hashing. Access tokens carry `userId`, `email`, `role`, and `employeeId` (only present when the authenticated user has a linked employee record) — refreshing a token re-derives all of these from the database, not from the refresh token's own (deliberately minimal) claims
 - **Validation**: Joi
 - **Testing**: Jest + Supertest
 
@@ -29,13 +29,15 @@ cd backend
 npm install
 cp .env.example .env   # then fill in the values, see below
 npm run migrate         # runs all Knex migrations
-npm run seed             # seeds a super admin user, leave types, and public holidays
+npm run seed             # seeds a starter dataset — see below
 npm run dev               # starts the API with tsx watch
 ```
 
 For production: `npm run build && npm start` (compiles TypeScript to `dist/` and runs the compiled output).
 
-Run tests with `npm test` (uses the `test` Knex environment and the seed files under `v1/seeds/test/`).
+`npm run seed` (Knex `development`/`production` environment, files under `v1/seeds/`) populates a starter dataset, safe to re-run (every file checks for existing rows first): a `super_admin` and `hr_admin` account, 3 teams, 6 employee/manager accounts with linked employee records, leave types, current-year leave balances, public holidays, 3 sample leave requests (pending/approved/rejected), and one generated payroll run (June 2026) for every seeded employee. All seeded accounts use the password `password` — **these are demo credentials, not real secrets; change them before deploying anywhere reachable.** See `v1/seeds/` for the full roster and emails.
+
+Run tests with `npm test` (uses the `test` Knex environment and the seed files under `v1/seeds/test/`). The `test` environment points at a **separate database** (`TEST_DB_NAME`, defaults to `${DB_NAME}_test`) — the suite truncates and reseeds its fixture tables before every test, which would destroy real data if it ran against the same database as `development`. Create the test database once (`createdb ${DB_NAME}_test`); a Jest `globalSetup` migrates it automatically before the suite runs, so it never needs a manual `npm run migrate` step.
 
 ### Environment variables
 
@@ -61,6 +63,7 @@ Run tests with `npm test` (uses the `test` Knex environment and the seed files u
 
 | Variable                       | Default                      | Purpose                                      |
 | ------------------------------ | ---------------------------- | -------------------------------------------- |
+| `TEST_DB_NAME`                 | `${DB_NAME}_test`            | Database used by `npm test` (`test` Knex environment) — always separate from `DB_NAME` so the test suite's truncate/reseed cycle can't touch dev/production data |
 | `CORS_ALLOWED_ORIGINS`         | falls back to `FRONTEND_URL` | Comma-separated list of allowed CORS origins |
 | `RATE_LIMIT_WINDOW_MS`         | `900000` (15 min)            | Global rate limiter window                   |
 | `RATE_LIMIT_MAX_REQUESTS`      | `100`                        | Global rate limiter max requests per window  |
@@ -96,6 +99,10 @@ See `.env.example` for a filled-in starting point for local development.
 - Payslips are versioned: re-running payroll for the same employee/period never overwrites history — it creates a new version, and `getLatestPayslipForEmployee` returns the current one.
 - Triggering a payroll run (`POST /v1/payroll-runs`) is restricted to `super_admin`/`hr_admin`.
 
+### Users
+
+- `GET /v1/users` takes its filters entirely from the query string (never the request body, since GET requests can't reliably carry one): `?type=multiple&page=&limit=&status=` for a paginated list, or `?type=single&id=<uuid>` / `?type=single&email=<email>` for a single user lookup (by id or email). A single-user lookup returns `id`, `name`, `email`, `status`, and `roles`.
+
 ### Employees
 
 - `employmentType` is restricted to `full_time` or `contract`.
@@ -104,6 +111,8 @@ See `.env.example` for a filled-in starting point for local development.
 - New employee records default to `is_active: true`.
 - Activating/deactivating an employee (`POST /v1/employees/:id/activate` / `POST /v1/employees/:id/deactivate`) is restricted to `super_admin`/`hr_admin`.
 - Soft-deleting an employee (`DELETE /v1/employees/:id`) is restricted to `super_admin`/`hr_admin` — it sets `deleted: true` rather than removing the row, and the record is then excluded from all reads, updates, and payroll runs.
+- `GET /v1/employees`, `GET /v1/employees/:id`, and the internal user-id lookup all join `users` so results include the employee's `name` and `email`, not just their `user_id`.
+- A plain `employee`-role caller of `GET /v1/employees` is automatically scoped to their own `team_id` — any `team` query param they send is overridden server-side with their own team. `super_admin`, `hr_admin`, and `manager` callers are unrestricted.
 
 ### Authorization matrix (`v1/middlewares/authorize.ts`)
 
@@ -112,7 +121,7 @@ See `.env.example` for a filled-in starting point for local development.
 | List all users                                 | `super_admin`, `hr_admin`, `manager`                                                                   |
 | Update / delete a user, assign or revoke roles | `super_admin`, `hr_admin` (delete: `super_admin` only)                                                 |
 | Create / update / delete a team                | `super_admin`, `hr_admin`                                                                              |
-| List all employees                             | `super_admin`, `hr_admin`, `manager`                                                                   |
+| List all employees                             | `super_admin`, `hr_admin`, `manager`, `employee` (`employee` is scoped to their own team)              |
 | View / create / update a single employee       | `super_admin`, `hr_admin`, `manager`, `employee` (self-service fields only for `employee` — see above) |
 | Activate / deactivate an employee              | `super_admin`, `hr_admin`                                                                              |
 | Soft-delete an employee                        | `super_admin`, `hr_admin`                                                                              |
@@ -170,10 +179,10 @@ net = gross - PAYE - NSSF - SHIF - AHL
 | Deduction   | Amount (KES)  |
 | ----------- | ------------- |
 | PAYE        | 7,383.35      |
-| NSSF        | 540.00        |
+| NSSF        | 3,000.00      |
 | SHIF        | 1,375.00      |
 | AHL         | 750.00        |
-| **Net pay** | **39,951.65** |
+| **Net pay** | **37,491.65** |
 
 ## Future improvements
 

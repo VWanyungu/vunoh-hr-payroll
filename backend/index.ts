@@ -1,27 +1,30 @@
-import express from 'express';
-import 'dotenv/config';
-import checkVersion from './middlewares/version.js';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import compression from 'compression';
-import { requestLogger } from './middlewares/logger.js';
-import logger from './utils/logger.js';
-import { validateEnv } from './utils/envValidation.js';
-import { performHealthCheck, getHealthStatus } from './utils/healthCheck.js';
-import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
-import { sanitizeResponseMiddleware } from './middlewares/sanitizeResponse.js';
+import express from "express";
+import "dotenv/config";
+import checkVersion from "./middlewares/version.js";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import compression from "compression";
+import { requestLogger } from "./middlewares/logger.js";
+import logger from "./utils/logger.js";
+import { validateEnv } from "./utils/envValidation.js";
+import { performHealthCheck, getHealthStatus } from "./utils/healthCheck.js";
+import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
+import { sanitizeResponseMiddleware } from "./middlewares/sanitizeResponse.js";
 
 validateEnv();
 
-const app = express()
+const app = express();
 
-const corsOrigins = process.env.CORS_ALLOWED_ORIGINS 
-  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : [process.env.FRONTEND_URL || 'http://localhost:5173'];
+const corsOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(",").map((origin) => origin.trim())
+  : [process.env.FRONTEND_URL || "http://127.0.0.1:5500"];
 
 const corsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  origin: (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void,
+  ) => {
     if (!origin || corsOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -29,41 +32,43 @@ const corsOptions = {
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+const frontendUrl = process.env.FRONTEND_URL || "http://127.0.0.1:5500";
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'", frontendUrl],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'", frontendUrl],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
     },
-  },
-}));
+  }),
+);
 
 app.use(cors(corsOptions));
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(requestLogger);
 app.use(sanitizeResponseMiddleware);
 
 const globalLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000"), // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100"),
   message: {
-    status: 'error',
-    message: 'Too many requests from this IP, please try again later.',
+    status: "error",
+    message: "Too many requests from this IP, please try again later.",
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -72,16 +77,16 @@ const globalLimiter = rateLimit({
 app.use(globalLimiter);
 app.use(checkVersion());
 
-app.get('/health', async (req, res) => {
+app.get("/health", async (req, res) => {
   try {
     const health = await performHealthCheck();
     const statusCode = getHealthStatus(health);
     res.status(statusCode).json(health);
   } catch (error) {
-    logger.error({ error }, 'Health check failed');
+    logger.error({ error }, "Health check failed");
     res.status(500).json({
-      status: 'error',
-      message: 'Health check failed',
+      status: "error",
+      message: "Health check failed",
     });
   }
 });
@@ -90,35 +95,35 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const server = app.listen(process.env.PORT, () => {
-  logger.info({ port: process.env.PORT }, 'App live on port');
+  logger.info({ port: process.env.PORT }, "App live on port");
 });
 
 const gracefulShutdown = (signal: string) => {
   logger.info({ signal }, `${signal} received, shutting down gracefully`);
-  
+
   server.close(() => {
-    logger.info('Server closed');
+    logger.info("Server closed");
     process.exit(0);
   });
 
   setTimeout(() => {
-    logger.error('Forced shutdown after timeout');
+    logger.error("Forced shutdown after timeout");
     process.exit(1);
   }, 10000);
 };
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
-process.on('uncaughtException', (error) => {
-  logger.error({ error }, 'Uncaught exception');
-  gracefulShutdown('uncaughtException');
+process.on("uncaughtException", (error) => {
+  logger.error({ error }, "Uncaught exception");
+  gracefulShutdown("uncaughtException");
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.log(reason)
-  console.log(promise)
-  
-  logger.error({ reason, promise }, 'Unhandled promise rejection');
-  gracefulShutdown('unhandledRejection');
+process.on("unhandledRejection", (reason, promise) => {
+  console.log(reason);
+  console.log(promise);
+
+  logger.error({ reason, promise }, "Unhandled promise rejection");
+  gracefulShutdown("unhandledRejection");
 });

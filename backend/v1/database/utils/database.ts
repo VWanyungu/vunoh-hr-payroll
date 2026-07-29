@@ -51,6 +51,10 @@ const EMPLOYEE_COLUMNS = [
   "updated_at",
 ];
 
+const EMPLOYEE_COLUMNS_QUALIFIED = EMPLOYEE_COLUMNS.map(
+  (c) => `employees.${c}`,
+);
+
 const SENSITIVE_EMPLOYEE_FIELDS = ["salary", "resume", "national_id"];
 
 export function sanitizeEmployee<T extends Record<string, unknown>>(
@@ -185,6 +189,45 @@ export class Users {
         userId: user.id,
         email: user.email,
         passwordHash: user.password_hash,
+        role: user.roles,
+      };
+    } catch (error) {
+      return { error } as UserLookupResult & { error: unknown };
+    }
+  }
+
+  static async getSingleUserById(id: string): Promise<UserLookupResult> {
+    try {
+      const user = await db("users")
+        .leftJoin("user_roles", "users.id", "user_roles.user_id")
+        .select("users.id", "users.name", "users.email", "users.status")
+        .select(
+          db.raw(`
+            COALESCE(
+                json_agg(
+                json_build_object(
+                    'id', user_roles.id,
+                    'role', user_roles.role,
+                    'team_id', user_roles.team_id
+                )
+                ) FILTER (WHERE user_roles.id IS NOT NULL),
+                '[]'
+            ) AS roles
+            `),
+        )
+        .where("users.id", id)
+        .groupBy("users.id", "users.name", "users.email", "users.status")
+        .first();
+
+      if (!user) {
+        return {};
+      }
+
+      return {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        status: user.status,
         role: user.roles,
       };
     } catch (error) {
@@ -552,7 +595,10 @@ export class Employees {
     search,
   }: PaginationInput & EmployeeFilters) {
     try {
-      const employeesQuery = db("employees").select(EMPLOYEE_COLUMNS);
+      const employeesQuery = db("employees")
+        .innerJoin("users", "employees.user_id", "users.id")
+        .select(EMPLOYEE_COLUMNS_QUALIFIED)
+        .select("users.name as name", "users.email as email");
       employeesQuery.where("deleted", false);
       if (team) employeesQuery.where("team_id", team);
       if (manager) employeesQuery.where("manager_id", manager);
@@ -569,7 +615,7 @@ export class Employees {
         const employees = await employeesQuery
           .limit(resolvedLimit)
           .offset(offset)
-          .orderBy("id");
+          .orderBy("employees.id");
 
         const totalQuery = db("employees");
         totalQuery.where("deleted", false);
@@ -590,7 +636,7 @@ export class Employees {
         };
       }
 
-      const employees = await employeesQuery.orderBy("id");
+      const employees = await employeesQuery.orderBy("employees.id");
 
       return {
         employees,
@@ -631,8 +677,10 @@ export class Employees {
   static async getEmployeeById(id: string) {
     try {
       const employee = await db("employees")
-        .select(EMPLOYEE_COLUMNS)
-        .where("id", id)
+        .innerJoin("users", "employees.user_id", "users.id")
+        .select(EMPLOYEE_COLUMNS_QUALIFIED)
+        .select("users.name as name", "users.email as email")
+        .where("employees.id", id)
         .where("deleted", false)
         .first();
 
@@ -645,8 +693,10 @@ export class Employees {
   static async getEmployeeByUserId(userId: UserId) {
     try {
       const employee = await db("employees")
-        .select(EMPLOYEE_COLUMNS)
-        .where("user_id", userId)
+        .innerJoin("users", "employees.user_id", "users.id")
+        .select(EMPLOYEE_COLUMNS_QUALIFIED)
+        .select("users.name as name", "users.email as email")
+        .where("employees.user_id", userId)
         .where("deleted", false)
         .first();
 
