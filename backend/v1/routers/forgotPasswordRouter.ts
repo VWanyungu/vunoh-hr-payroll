@@ -36,7 +36,7 @@ router.post("/", async (req, res) => {
   const sendRes = await sendPasswordResetMail({
     to: user.email,
     subject: "Vunoh HR and Payroll - Password Reset",
-    html: `<p><a href="${process.env.FRONTEND_URL}/reset-password/${forgotPasswordToken}">Click to reset yout password. This link is valid for 10 minutes</a></p>`,
+    html: `<p><a href="${process.env.FRONTEND_URL}/html/public/reset-password.html?resetToken=${forgotPasswordToken}">Click to reset yout password. This link is valid for 10 minutes</a></p>`,
   });
 
   if (sendRes.status === "error") {
@@ -50,7 +50,7 @@ router.post("/", async (req, res) => {
   res.status(200).json({
     status: "success",
     data: {
-      resetLink: `${process.env.FRONTEND_URL}/reset-password/${forgotPasswordToken}`,
+      resetLink: `${process.env.FRONTEND_URL}/html/public/reset-password.html?resetToken=${forgotPasswordToken}`,
     },
     message: "Email sent",
   });
